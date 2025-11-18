@@ -11,6 +11,7 @@ module.exports = new EntitySchema({
     },
     name: { type: "varchar", unique: true },
     quantity: { type: "int" },
+    baseRate: { type: "float", default: 0 },
     isTaxable: { type: "boolean", default: true },
     createdAt: { type: "timestamp", createDate: true },
     updatedAt: { type: "timestamp", updateDate: true },
