@@ -6,10 +6,10 @@ module.exports = new EntitySchema({
   columns: {
     id: { primary: true, type: "int", generated: true },
 
-    // CRITICAL FIX: Add explicit foreign key columns
+    // foreign key columns
     productId: {
       type: "int",
-      nullable: true, // Allow null if product is deleted
+      nullable: true,
     },
     billId: {
       type: "int",
@@ -17,11 +17,14 @@ module.exports = new EntitySchema({
     },
 
     quantity: { type: "int" },
+    baseQuantity: { type: "int", default: 0 },
     unit: { type: "varchar" },
     isTaxable: { type: "boolean" },
     rate: { type: "float" },
+    adjustedRate: { type: "float", default: 0 },
     discountPercent: { type: "float", default: 0 },
     discountAmount: { type: "float", default: 0 },
+    billDiscountAmount: { type: "float", default: 0 },
     total: { type: "float" },
   },
   relations: {

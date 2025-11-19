@@ -6,37 +6,60 @@ const salesItemService = require("./salesItem.service");
 
 class BillService {
   calculateBillTotals(items, billDiscountPercent = 0, vatPercent = 13) {
-    let subtotal = 0;
-    let taxableTotal = 0;
-    let nonTaxableTotal = 0;
+    let subTotal = 0;
 
     const calculatedItems = items.map((item) => {
       const row = salesItemService.calculateRowTotal(item);
-      subtotal += row.finalTotal;
-
-      if (item.isTaxable) {
-        taxableTotal += row.finalTotal;
-      } else {
-        nonTaxableTotal += row.finalTotal;
-      }
+      subTotal += row.finalTotal; // item level total before bill discount
       return row;
     });
 
-    const discountAmount = subtotal * (billDiscountPercent / 100);
-    const afterDiscount = subtotal - discountAmount;
-    // VAT only applies to taxable goods
-    const vatAmount = taxableTotal * (vatPercent / 100);
-    const grandTotal = afterDiscount + vatAmount;
+    //!apply bill discount proportionately per item
+    calculatedItems.forEach((item, index) => {
+      const billDiscountAmount = item.finalTotal * (billDiscountPercent / 100);
+      const afterBillDiscount = item.finalTotal - billDiscountAmount;
 
+      //store per item discount results
+      item.billDiscountAmount = billDiscountAmount;
+      item.afterBillDiscount = afterBillDiscount;
+    });
+
+    //!apply VAT to only taxable items
+    calculatedItems.forEach((item) => {
+      if (item.isTaxable) {
+        item.vatAmount = item.afterBillDiscount * (vatPercent / 100);
+        item.afterVat = item.afterBillDiscount + item.vatAmount;
+      } else {
+        item.vatAmount = 0;
+        item.afterVat = item.afterBillDiscount;
+      }
+    });
+
+    //aggregate totals
+    const discountAmount = calculatedItems.reduce(
+      (sum, i) => sum + i.billDiscountAmount,
+      0
+    );
+
+    const taxableTotal = calculatedItems
+      .filter((i) => i.isTaxable)
+      .reduce((sum, i) => sum + i.afterBillDiscount, 0);
+
+    const nonTaxableTotal = calculatedItems
+      .filter((i) => !i.isTaxable)
+      .reduce((sum, i) => sum + i.afterBillDiscount, 0);
+
+    const vatAmount = calculatedItems.reduce((sum, i) => sum + i.vatAmount, 0);
+
+    const grandTotal = calculatedItems.reduce((sum, i) => sum + i.afterVat, 0);
     return {
-      subtotal,
+      subTotal,
       discountAmount,
-      afterDiscount,
       taxableTotal,
       nonTaxableTotal,
       vatAmount,
       grandTotal,
-      calculatedItems,
+      calculatedItems, // all item level calculations
     };
   }
 
@@ -83,12 +106,13 @@ class BillService {
         billData.vatPercent
       );
 
+      //save sakesBill
       const billRepository = queryRunner.manager.getRepository(SalesBill);
       const bill = billRepository.create({
         invoiceNumber,
         salesDate: billData.salesDate,
         customer: billData.customer,
-        subTotal: totals.subtotal,
+        subTotal: totals.subTotal,
         discountPercent: billData.discountPercent || 0,
         discountAmount: totals.discountAmount,
         taxableTotal: totals.taxableTotal,
@@ -102,21 +126,13 @@ class BillService {
       // Create sales items and update product quantities
       const itemRepository = queryRunner.manager.getRepository(SaleItem);
 
-      for (const itemData of billData.items) {
+      for (let i = 0; i < billData.items.length; i++) {
+        const itemData = billData.items[i];
+        const calculatedItem = totals.calculatedItems[i];
         const baseQuantity = salesItemService.getBaseQuantity(
           itemData.quantity,
           itemData.unit
         );
-
-        const calculatedItem = totals.calculatedItems.find(
-          (i) => i.baseQuantity === baseQuantity
-        );
-
-        if (!calculatedItem) {
-          throw new Error(
-            `Calculation error for item with quantity ${itemData.quantity}`
-          );
-        }
 
         //Explicitly set productId and billId
         const salesItem = itemRepository.create({
@@ -124,11 +140,14 @@ class BillService {
           billId: savedBill.id, // Explicit foreign key
           quantity: itemData.quantity,
           unit: itemData.unit,
+          baseQuantity: baseQuantity,
           rate: itemData.rate,
+          adjustedRate: calculatedItem.afterVat / baseQuantity,
           isTaxable: itemData.isTaxable,
           discountPercent: itemData.discountPercent || 0,
           discountAmount: calculatedItem.discountAmount,
-          total: calculatedItem.finalTotal,
+          billDiscountAmount: calculatedItem.billDiscountAmount,
+          total: calculatedItem.afterVat,
           product: { id: itemData.productId }, //set relation
           bill: savedBill, // set relation
         });
