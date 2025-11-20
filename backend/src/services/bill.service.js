@@ -97,8 +97,8 @@ class BillService {
       }
 
       // Generate invoice number
-      const invoiceNumber = await this.generateInvoiceNumber();
-
+      // const invoiceNumber = await this.generateInvoiceNumber();
+      const invoiceNumber = billData.invoiceNumber;
       // Calculate totals
       const totals = this.calculateBillTotals(
         billData.items,
@@ -179,11 +179,11 @@ class BillService {
     }
   }
 
-  async generateInvoiceNumber() {
-    const billRepository = AppDataSource.getRepository(SalesBill);
-    const billCount = await billRepository.count();
-    return `INV-${String(billCount + 1).padStart(4, "0")}`;
-  }
+  // async generateInvoiceNumber() {
+  //   const billRepository = AppDataSource.getRepository(SalesBill);
+  //   const billCount = await billRepository.count();
+  //   return `INV-${String(billCount + 1).padStart(4, "0")}`;
+  // }
 }
 
 module.exports = new BillService();

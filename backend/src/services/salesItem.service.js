@@ -28,9 +28,4 @@ class SalesItemService {
   }
 }
 
-//temporary test
-// const service = new BillService();
-// console.log("2 dozen = ", service.getBaseQuantity(2, "dozen"), "units");
-// console.log(service.getBaseQuantity(50, "pcs"), "units");
-
 module.exports = new SalesItemService();
