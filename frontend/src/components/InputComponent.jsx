@@ -1,8 +1,7 @@
-import React from "react";
 import { AiFillBook } from "react-icons/ai";
 
 const InputComponent = ({
-  icon: Icon = AiFillBook,
+  icon: Icon = <AiFillBook />,
   label = "Invoice Number",
   required = false,
   type = "text",
@@ -14,53 +13,30 @@ const InputComponent = ({
   className = "",
 }) => {
   return (
-    // <div className="  flex-1  h-20  bg-amber-50 px-3  border border-black-100">
-    //   {/* top row */}
-    //   <div className="flex flex-col gap-2 items-start pt-1 ">
-    //     <div className="flex gap-2 items-center ">
-    //       <span>
-    //         <AiFillBook />
-    //       </span>
-    //       <span>Invoice Number</span>
-    //       <span className="bg-amber-600 text-white px-2 py-1 rounded-lg text-xs font-medium">
-    //         Required
-    //       </span>
-    //     </div>
-    //     {/* input box */}
-    //     <div className="w-full">
-    //       <input
-    //         type="text"
-    //         className="align-center w-full border border-amber-300 rounded px-2 py-1"
-    //       />
-    //     </div>
-    //   </div>
-    // </div>
     <div
-      className={`flex-1 h-20 bg-amber-50 px-3 border border-black-100 ${className}`}
+      className={`flex-1 bg-white border border-gray-200 rounded-lg p-4 ${className}`}
     >
-      <div className="flex flex-col gap-2 items-start pt-1">
-        <div className="flex gap-2 items-center">
-          <span>
-            <Icon />
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-gray-600">
+            <Icon size={16} />
           </span>
-          <span>{label}</span>
+          <span className="text-sm font-medium text-gray-700">{label}</span>
           {required && (
-            <span className="bg-amber-600 text-white px-2 py-1 rounded-lg text-xs font-medium">
+            <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded font-medium">
               Required
             </span>
           )}
         </div>
-        <div className="w-full">
-          <input
-            type={type}
-            name={name}
-            placeholder={placeholder}
-            value={value}
-            onChange={onChange}
-            disabled={disabled}
-            className="align-center w-full border border-amber-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-black-50"
-          />
-        </div>
+        <input
+          type={type}
+          name={name}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+        />
       </div>
     </div>
   );

@@ -30,6 +30,9 @@ const billService = {
       throw error.response?.data || error.message;
     }
   },
+  getNewInvoiceNumber() {
+    return axiosInstance.get("/bill/invoice");
+  },
 };
 
 export default billService;

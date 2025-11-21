@@ -41,6 +41,15 @@ class BillController {
   //   }
   // }\
 
+  async getNewInvoiceNumber(req, res) {
+    try {
+      const invoiceNumber = await billService.generateInvoiceNumber();
+      res.json({ invoiceNumber });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   async createBill(req, res, next) {
     try {
       const billData = req.body;

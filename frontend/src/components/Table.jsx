@@ -209,7 +209,7 @@ const Table = ({
       <div className="flex justify-end mt-4">
         <button
           onClick={onAddRow}
-          className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700"
+          className="bg-slate-700 text-white px-4 py-2 rounded shadow hover:bg-slate-500"
         >
           + Add Row
         </button>

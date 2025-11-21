@@ -180,11 +180,40 @@ class BillService {
     }
   }
 
-  // async generateInvoiceNumber() {
-  //   const billRepository = AppDataSource.getRepository(SalesBill);
-  //   const billCount = await billRepository.count();
-  //   return `INV-${String(billCount + 1).padStart(4, "0")}`;
-  // }
+  async generateInvoiceNumber() {
+    const billRepository = AppDataSource.getRepository(SalesBill);
+
+    try {
+      // GET THE LAST BILL
+      const lastBill = await billRepository.findOne({
+        where: {},
+        order: { id: "DESC" },
+        select: ["invoiceNumber"],
+      });
+
+      console.log("Last bill found:", lastBill);
+
+      if (!lastBill || !lastBill.invoiceNumber) {
+        return "INV-0001"; // First invoice
+      }
+
+      //  FIX: Extract number properly and pad it
+      const lastNumberStr = lastBill.invoiceNumber.split("-")[1];
+      const lastNumber = parseInt(lastNumberStr);
+      const nextNumber = lastNumber + 1;
+
+      // Pad with leading zeros to 4 digits
+      const nextInvoiceNumber = `INV-${nextNumber.toString().padStart(4, "0")}`;
+
+      console.log("Last number:", lastNumber, "Next number:", nextNumber);
+      console.log("Generated invoice number:", nextInvoiceNumber);
+
+      return nextInvoiceNumber;
+    } catch (error) {
+      console.error("Error generating invoice number:", error);
+      return `INV-${Date.now()}`;
+    }
+  }
 }
 
 module.exports = new BillService();
