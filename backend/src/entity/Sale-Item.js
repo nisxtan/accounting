@@ -21,6 +21,7 @@ module.exports = new EntitySchema({
     unit: { type: "varchar" },
     isTaxable: { type: "boolean" },
     rate: { type: "float" },
+    individualRate: { type: "float", default: 0 },
     adjustedRate: { type: "float", default: 0 },
     discountPercent: { type: "float", default: 0 },
     discountAmount: { type: "float", default: 0 },

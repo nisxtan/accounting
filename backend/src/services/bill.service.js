@@ -106,7 +106,7 @@ class BillService {
         billData.vatPercent
       );
 
-      //save sakesBill
+      //save salesBill
       const billRepository = queryRunner.manager.getRepository(SalesBill);
       const bill = billRepository.create({
         invoiceNumber,
@@ -142,6 +142,7 @@ class BillService {
           unit: itemData.unit,
           baseQuantity: baseQuantity,
           rate: itemData.rate,
+          individualRate: calculatedItem.finalTotal / baseQuantity,
           adjustedRate: calculatedItem.afterVat / baseQuantity,
           isTaxable: itemData.isTaxable,
           discountPercent: itemData.discountPercent || 0,

@@ -33,6 +33,7 @@ const Home = () => {
       const result = await saveBill();
       alert("Bill saved successfully!");
       console.log("Saved bill:", result);
+      window.location.reload();
     } catch (error) {
       alert("Failed to save bill: " + error.message);
     }

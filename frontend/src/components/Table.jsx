@@ -11,22 +11,21 @@ const Table = ({
 }) => {
   const handleInputChange = (id, field, value) => {
     if (field === "unit") {
-      const currentItem = items.find((item) => item.id === id);
-
+      // const currentItem = items.find((item) => item.id === id);
       // Auto-adjust quantity
-      if (value === "dozen" && currentItem.unit === "pcs") {
-        onUpdateItem(id, "quantity", 12); // 1 dozen = 12 pcs
-      } else if (value === "pcs" && currentItem.unit === "dozen") {
-        onUpdateItem(id, "quantity", 1); // 12 pcs = 1 dozen
-      } else if (value === "box" && currentItem.unit === "pcs") {
-        onUpdateItem(id, "quantity", 6); // 1 box = 6 pcs
-      } else if (value === "pcs" && currentItem.unit === "box") {
-        onUpdateItem(id, "quantity", 1); // 6 pcs = 1 box
-      } else if (value === "box" && currentItem.unit === "dozen") {
-        onUpdateItem(id, "quantity", 2); // 1 box = 2 dozen (if 1 box = 24 pcs)
-      } else if (value === "dozen" && currentItem.unit === "box") {
-        onUpdateItem(id, "quantity", 1); // 2 dozen = 1 box
-      }
+      //   if (value === "dozen" && currentItem.unit === "pcs") {
+      //     onUpdateItem(id, "quantity", 12); // 1 dozen = 12 pcs
+      //   } else if (value === "pcs" && currentItem.unit === "dozen") {
+      //     onUpdateItem(id, "quantity", 1); // 12 pcs = 1 dozen
+      //   } else if (value === "box" && currentItem.unit === "pcs") {
+      //     onUpdateItem(id, "quantity", 6); // 1 box = 6 pcs
+      //   } else if (value === "pcs" && currentItem.unit === "box") {
+      //     onUpdateItem(id, "quantity", 1); // 6 pcs = 1 box
+      //   } else if (value === "box" && currentItem.unit === "dozen") {
+      //     onUpdateItem(id, "quantity", 2); // 1 box = 2 dozen (if 1 box = 24 pcs)
+      //   } else if (value === "dozen" && currentItem.unit === "box") {
+      //     onUpdateItem(id, "quantity", 1); // 2 dozen = 1 box
+      //   }
     }
 
     onUpdateItem(id, field, field === "isTaxable" ? value === "true" : value);

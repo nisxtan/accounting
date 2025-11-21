@@ -17,12 +17,14 @@ class SalesItemService {
 
     //calculate the final total
     const finalTotal = initialTotal - discountAmount;
+    const adjustedRate = finalTotal / baseQuantity;
 
     return {
       baseQuantity,
       initialTotal,
       discountAmount,
       finalTotal,
+      adjustedRate,
       isTaxable: item.isTaxable,
     };
   }
