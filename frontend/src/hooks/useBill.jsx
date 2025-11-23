@@ -167,6 +167,8 @@
 import { useState, useEffect } from "react";
 import { productService } from "../services/productApi";
 import billService from "../api/billServices";
+import { useCallback } from "react";
+// import { generateInvoiceNumber } from "../../../backend/src/services/bill.service";
 
 export const useBill = () => {
   const [items, setItems] = useState([
@@ -187,37 +189,22 @@ export const useBill = () => {
     customer: "",
     discountPercent: 0,
     vatPercent: 13,
-    invoiceNumber: "", // Will be set from API
+    invoiceNumber: "", //comes from backend
   });
 
   const [loading, setLoading] = useState(true);
 
-  // ⭐ Load invoice number on page load
-  useEffect(() => {
-    const initializeBill = async () => {
-      try {
-        await loadProducts();
-        await getInvoiceNumberFromBackend();
-      } catch (error) {
-        console.error("Initialization error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    initializeBill();
-  }, []);
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     try {
       const productsData = await productService.getAll();
       setProducts(productsData);
     } catch (error) {
       console.error("Failed to load products:", error);
     }
-  };
+  }, []);
 
   //Get invoice number from backend API
-  const getInvoiceNumberFromBackend = async () => {
+  const getInvoiceNumberFromBackend = useCallback(async () => {
     try {
       const response = await billService.getNewInvoiceNumber();
       console.log("Invoice number received:", response.data.invoiceNumber);
@@ -234,8 +221,43 @@ export const useBill = () => {
         invoiceNumber: `INV-${Date.now()}`,
       }));
     }
-  };
+  }, []);
 
+  // Load invoice number on page load
+  useEffect(() => {
+    let mounted = true;
+    const initializeBill = async () => {
+      try {
+        await loadProducts();
+        if (!mounted) return;
+        await getInvoiceNumberFromBackend();
+      } catch (error) {
+        console.error("Initialization error:", error);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    initializeBill();
+    return () => {
+      mounted = false;
+    };
+  }, [loadProducts, getInvoiceNumberFromBackend]);
+
+  //listen for cross-tab invoice updates
+  useEffect(() => {
+    const handleStorage = (e) => {
+      if (e.key == "invoice-updated") {
+        getInvoiceNumberFromBackend().catch((err) => {
+          console.error(
+            "Failed to refresh invoice number after storage event",
+            err
+          );
+        });
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [getInvoiceNumberFromBackend]);
   const addEmptyRow = () => {
     const newItem = {
       id: Date.now() + Math.random(),
@@ -331,6 +353,12 @@ export const useBill = () => {
       };
 
       const savedBill = await billService.create(billPayload);
+      try {
+        localStorage.setItem("invoice-updated", Date.now().toString());
+      } catch (e) {
+        console.warn("could not write to localStorage ", e);
+      }
+      await getInvoiceNumberFromBackend();
       return savedBill;
     } catch (error) {
       console.error("Failed to save bill:", error);

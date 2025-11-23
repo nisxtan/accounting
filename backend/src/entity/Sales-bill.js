@@ -12,6 +12,7 @@ module.exports = new EntitySchema({
     invoiceNumber: {
       type: "varchar",
       nullable: true,
+      unique: true,
     },
     salesDate: {
       type: "date",
