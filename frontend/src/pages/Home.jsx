@@ -134,7 +134,7 @@ const Home = () => {
     products,
     billData,
     totals,
-    loading, // ⭐ Get loading state
+    loading,
     addEmptyRow,
     removeRow,
     updateItem,
@@ -214,6 +214,7 @@ const Home = () => {
           type="date"
           value={billData.salesDate}
           onChange={(e) => updateBillData("salesDate", e.target.value)}
+          max={new Date().toISOString().split("T")[0]}
         />
         <InputComponent
           icon={AiOutlineUser}

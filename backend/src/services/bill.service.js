@@ -69,6 +69,13 @@ class BillService {
     await queryRunner.startTransaction();
 
     try {
+      const salesDate = new Date(billData.salesDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      salesDate.setHours(0, 0, 0, 0);
+      if (salesDate > today) {
+        throw new Error("Sales date cannot be in the future");
+      }
       // validate all products exist BEFORE starting transaction
       const productRepository = queryRunner.manager.getRepository(Product);
 
@@ -191,13 +198,13 @@ class BillService {
         select: ["invoiceNumber"],
       });
 
-      console.log("Last bill found:", lastBill);
+      // console.log("Last bill found:", lastBill);
 
       if (!lastBill || !lastBill.invoiceNumber) {
         return "INV-0001"; // First invoice
       }
 
-      //  FIX: Extract number properly and pad it
+      //Extract number properly and pad it
       const lastNumberStr = lastBill.invoiceNumber.split("-")[1];
       const lastNumber = parseInt(lastNumberStr);
       const nextNumber = lastNumber + 1;

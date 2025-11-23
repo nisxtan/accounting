@@ -353,6 +353,7 @@ export const useBill = () => {
       };
 
       const savedBill = await billService.create(billPayload);
+      
       try {
         localStorage.setItem("invoice-updated", Date.now().toString());
       } catch (e) {

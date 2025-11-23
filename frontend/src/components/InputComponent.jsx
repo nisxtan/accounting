@@ -9,6 +9,7 @@ const InputComponent = ({
   value,
   onChange,
   name,
+  max,
   disabled = false,
   className = "",
 }) => {
@@ -35,6 +36,7 @@ const InputComponent = ({
           value={value}
           onChange={onChange}
           disabled={disabled}
+          max={max}
           className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
         />
       </div>
