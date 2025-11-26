@@ -37,7 +37,7 @@ const productService = {
   // CREATE PRODUCT
   create: async (productData) => {
     try {
-      const response = await axiosInstance.post("/products", productData);
+      const response = await axiosInstance.post("/product", productData);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;

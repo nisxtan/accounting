@@ -35,6 +35,48 @@ class ProductService {
     );
     return await this.getProductById(productId);
   }
+
+  // CREATE NEW PRODUCT
+  async createProduct(productData) {
+    const { name, quantity, baseRate, isTaxable } = productData;
+
+    // Validation
+    if (!name || name.trim() === "") {
+      throw new Error("Product name is required");
+    }
+
+    if (quantity === undefined || quantity === null || quantity < 0) {
+      throw new Error("Valid quantity is required");
+    }
+
+    if (baseRate === undefined || baseRate === null || baseRate < 0) {
+      throw new Error("Valid base rate is required");
+    }
+
+    const productRepository = AppDataSource.getRepository(Product);
+
+    // Check if product with same name already exists (case-insensitive)
+    const existingProduct = await productRepository
+      .createQueryBuilder("product")
+      .where("LOWER(product.name) = LOWER(:name)", { name: name.trim() })
+      .getOne();
+
+    if (existingProduct) {
+      throw new Error("Product with this name already exists");
+    }
+
+    // Create new product
+    const product = productRepository.create({
+      name: name.trim(),
+      quantity: parseInt(quantity),
+      baseRate: parseFloat(baseRate),
+      isTaxable: isTaxable !== undefined ? isTaxable : true,
+    });
+
+    // Save to database
+    const savedProduct = await productRepository.save(product);
+    return savedProduct;
+  }
 }
 
 module.exports = new ProductService();

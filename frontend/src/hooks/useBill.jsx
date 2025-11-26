@@ -380,5 +380,7 @@ export const useBill = () => {
     updateItem,
     updateBillData,
     saveBill,
+    loadProducts,
+    getInvoiceNumberFromBackend,
   };
 };
