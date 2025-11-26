@@ -97,7 +97,6 @@ class BillService {
       }
 
       // Generate invoice number
-      // const invoiceNumber = await this.generateInvoiceNumber();
       const invoiceNumber = billData.invoiceNumber;
       // Calculate totals
       const totals = this.calculateBillTotals(
@@ -122,6 +121,8 @@ class BillService {
         grandTotal: totals.grandTotal,
       });
       const savedBill = await billRepository.save(bill);
+
+      await this.markInvoiceNumberAsUsed(billData.invoiceNumber);
 
       // Create sales items and update product quantities
       const itemRepository = queryRunner.manager.getRepository(SaleItem);
@@ -180,38 +181,210 @@ class BillService {
     }
   }
 
+  // async generateInvoiceNumber() {
+  //   const reservationRepository =
+  //     AppDataSource.getRepository("InvoiceReservation");
+
+  //   try {
+  //     // Use PostgreSQL's NOW() function to calculate 10 minutes ago
+  //     const expiredReservations = await reservationRepository
+  //       .createQueryBuilder("reservation")
+  //       .where("reservation.inProgress = :inProgress", { inProgress: true })
+  //       .andWhere("reservation.isUsed = :isUsed", { isUsed: false })
+  //       .andWhere("reservation.lastUsed < NOW() - INTERVAL '10 minutes'") // ⭐ PostgreSQL time check
+  //       .getMany();
+
+  //     // If there are expired reservations, use the first one
+  //     if (expiredReservations.length > 0) {
+  //       const expiredReservation = expiredReservations[0];
+  //       expiredReservation.lastUsed = new Date();
+  //       const updated = await reservationRepository.save(expiredReservation);
+  //       console.log("🔄 Reused expired reservation:", updated.invoiceNumber);
+  //       return updated.invoiceNumber;
+  //     }
+
+  //     // Find the highest invoice number
+  //     const lastReservation = await reservationRepository
+  //       .createQueryBuilder("reservation")
+  //       .select("reservation.invoiceNumber")
+  //       .orderBy("reservation.invoiceNumber", "DESC")
+  //       .getOne();
+
+  //     let startNumber = 1;
+  //     if (lastReservation) {
+  //       const lastNum = parseInt(lastReservation.invoiceNumber.split("-")[1]);
+  //       startNumber = lastNum + 1;
+  //     }
+
+  //     // Find available number
+  //     let checkNumber = startNumber;
+  //     while (true) {
+  //       const newInvoiceNumber = `INV-${String(checkNumber).padStart(4, "0")}`;
+
+  //       // Check if number exists and is available
+  //       const foundReservation = await reservationRepository.findOne({
+  //         where: { invoiceNumber: newInvoiceNumber },
+  //       });
+
+  //       if (!foundReservation) {
+  //         // Create new reservation
+  //         const newReservation = reservationRepository.create({
+  //           invoiceNumber: newInvoiceNumber,
+  //           inProgress: true,
+  //           isUsed: false,
+  //           lastUsed: new Date(),
+  //         });
+  //         const saved = await reservationRepository.save(newReservation);
+  //         console.log("🆕 Created new reservation:", saved.invoiceNumber);
+  //         return saved.invoiceNumber;
+  //       }
+
+  //       // If reservation exists but is available
+  //       if (!foundReservation.inProgress && !foundReservation.isUsed) {
+  //         foundReservation.inProgress = true;
+  //         foundReservation.lastUsed = new Date();
+  //         const updated = await reservationRepository.save(foundReservation);
+  //         console.log(
+  //           "📝 Activated available reservation:",
+  //           updated.invoiceNumber
+  //         );
+  //         return updated.invoiceNumber;
+  //       }
+
+  //       checkNumber++;
+  //     }
+  //   } catch (error) {
+  //     console.error("Error generating invoice number:", error);
+  //     return `INV-${Date.now()}`;
+  //   }
+  // }
+
+  // async markInvoiceNumberAsUsed(invoiceNumber) {
+  //   const reservationRepo = AppDataSource.getRepository("InvoiceReservation");
+
+  //   try {
+  //     console.log("🔍 Marking invoice as used:", invoiceNumber);
+
+  //     const result = await reservationRepo
+  //       .createQueryBuilder()
+  //       .update()
+  //       .set({
+  //         isUsed: true,
+  //         inProgress: false,
+  //         lastUsed: () => "NOW()",
+  //       })
+  //       .where("invoiceNumber = :invoiceNumber", { invoiceNumber })
+  //       .andWhere("isUsed = false")
+  //       .execute();
+
+  //     if (result.affected > 0) {
+  //       console.log("✅ Successfully marked as used:", invoiceNumber);
+  //     } else {
+  //       console.log("⚠️ Invoice already used or not found:", invoiceNumber);
+  //     }
+  //   } catch (error) {
+  //     console.error("Error marking invoice as used:", error);
+  //   }
+  // }
+
+  // Replace your generateInvoiceNumber and markInvoiceNumberAsUsed methods with these:
+
   async generateInvoiceNumber() {
-    const billRepository = AppDataSource.getRepository(SalesBill);
+    const reservationRepository =
+      AppDataSource.getRepository("InvoiceReservation");
 
     try {
-      // GET THE LAST BILL
-      const lastBill = await billRepository.findOne({
-        where: {},
-        order: { id: "DESC" },
-        select: ["invoiceNumber"],
-      });
+      //Clean up expired reservations
+      await reservationRepository
+        .createQueryBuilder()
+        .update()
+        .set({
+          inProgress: false,
+          lastUsed: () => "NOW()",
+        })
+        .where("inProgress = :inProgress", { inProgress: true })
+        .andWhere("isUsed = :isUsed", { isUsed: false })
+        .andWhere("lastUsed < NOW() - INTERVAL '10 minutes'")
+        .execute();
 
-      console.log("Last bill found:", lastBill);
+      //Try to find an available reservation (not in progress, not used)
+      const availableReservation = await reservationRepository
+        .createQueryBuilder("reservation")
+        .where("reservation.inProgress = :inProgress", { inProgress: false })
+        .andWhere("reservation.isUsed = :isUsed", { isUsed: false })
+        .orderBy("reservation.invoiceNumber", "ASC")
+        .getOne();
 
-      if (!lastBill || !lastBill.invoiceNumber) {
-        return "INV-0001"; // First invoice
+      if (availableReservation) {
+        // Mark it as in progress
+        availableReservation.inProgress = true;
+        availableReservation.lastUsed = new Date();
+        const updated = await reservationRepository.save(availableReservation);
+        console.log("📝 Reusing available reservation:", updated.invoiceNumber);
+        return updated.invoiceNumber;
       }
 
-      //  FIX: Extract number properly and pad it
-      const lastNumberStr = lastBill.invoiceNumber.split("-")[1];
-      const lastNumber = parseInt(lastNumberStr);
-      const nextNumber = lastNumber + 1;
+      // Step 3: If no available reservation, create a new one
+      // Find the highest invoice number
+      const lastReservation = await reservationRepository
+        .createQueryBuilder("reservation")
+        .select("reservation.invoiceNumber")
+        .orderBy("reservation.invoiceNumber", "DESC")
+        .getOne();
 
-      // Pad with leading zeros to 4 digits
-      const nextInvoiceNumber = `INV-${nextNumber.toString().padStart(4, "0")}`;
+      let nextNumber = 1;
+      if (lastReservation) {
+        const lastNum = parseInt(lastReservation.invoiceNumber.split("-")[1]);
+        nextNumber = lastNum + 1;
+      }
 
-      console.log("Last number:", lastNumber, "Next number:", nextNumber);
-      console.log("Generated invoice number:", nextInvoiceNumber);
+      const newInvoiceNumber = `INV-${String(nextNumber).padStart(4, "0")}`;
 
-      return nextInvoiceNumber;
+      // Create new reservation
+      const newReservation = reservationRepository.create({
+        invoiceNumber: newInvoiceNumber,
+        inProgress: true,
+        isUsed: false,
+        lastUsed: new Date(),
+      });
+
+      const saved = await reservationRepository.save(newReservation);
+      console.log("🆕 Created new reservation:", saved.invoiceNumber);
+      return saved.invoiceNumber;
     } catch (error) {
       console.error("Error generating invoice number:", error);
+      // Fallback to timestamp-based number
       return `INV-${Date.now()}`;
+    }
+  }
+
+  async markInvoiceNumberAsUsed(invoiceNumber) {
+    const reservationRepo = AppDataSource.getRepository("InvoiceReservation");
+
+    try {
+      console.log("🔍 Marking invoice as used:", invoiceNumber);
+
+      const result = await reservationRepo
+        .createQueryBuilder()
+        .update()
+        .set({
+          isUsed: true,
+          inProgress: false,
+          lastUsed: () => "NOW()",
+        })
+        .where("invoiceNumber = :invoiceNumber", { invoiceNumber })
+        .execute();
+
+      if (result.affected > 0) {
+        console.log("✅ Successfully marked as used:", invoiceNumber);
+        return true;
+      } else {
+        console.log("⚠️ Invoice not found:", invoiceNumber);
+        return false;
+      }
+    } catch (error) {
+      console.error("Error marking invoice as used:", error);
+      throw error;
     }
   }
 }
