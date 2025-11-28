@@ -34,7 +34,7 @@ const billService = {
     return axiosInstance.get("/bill/invoice");
   },
 
-  async getAllBills(filters = {}) {
+  async getAllBills(filters = {}, pagination = {}) {
     try {
       const queryParams = new URLSearchParams();
 
@@ -43,14 +43,17 @@ const billService = {
       if (filters.isTaxable) queryParams.append("isTaxable", filters.isTaxable);
       if (filters.minTotal) queryParams.append("minTotal", filters.minTotal);
       if (filters.maxTotal) queryParams.append("maxTotal", filters.maxTotal);
+      //add pagination
+      const page = pagination.page || 1;
+      const limit = pagination.limit || 10;
 
+      queryParams.append("page", page);
+      queryParams.append("limit", limit);
       const response = await axiosInstance.get(`/bill?${queryParams}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
     }
-
-    // add all filters to query strings
   },
 };
 

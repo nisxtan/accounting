@@ -325,8 +325,63 @@ class BillService {
         });
       }
 
+      //Pagination
+      const page = parseInt(filters.page) || 1;
+      const limit = parseInt(filters.limit) || 10;
+      const skip = (page - 1) * limit;
+
+      //apply pagination to query
+      queryBuilder.skip(skip).take(limit);
+
       const bills = await queryBuilder.getMany();
-      return bills;
+
+      //count query - get total number of records
+      const countQueryBuilder = billRepository
+        .createQueryBuilder("bill")
+        .select("COUNT(bill.id)", "count");
+
+      // Apply the same filters to count query
+      if (filters.customerName) {
+        countQueryBuilder.andWhere("bill.customer ILIKE :customerName", {
+          customerName: `%${filters.customerName}%`,
+        });
+      }
+
+      if (filters.isTaxable !== undefined) {
+        if (filters.isTaxable === "true") {
+          countQueryBuilder.andWhere("bill.taxableTotal > 0");
+        } else if (filters.isTaxable === "false") {
+          countQueryBuilder.andWhere("bill.taxableTotal = 0");
+        }
+      }
+
+      if (filters.minTotal && !isNaN(filters.minTotal)) {
+        countQueryBuilder.andWhere("bill.grandTotal >= :minTotal", {
+          minTotal: Number(filters.minTotal),
+        });
+      }
+
+      if (filters.maxTotal && !isNaN(filters.maxTotal)) {
+        countQueryBuilder.andWhere("bill.grandTotal <= :maxTotal", {
+          maxTotal: Number(filters.maxTotal),
+        });
+      }
+      const countResult = await countQueryBuilder.getRawOne();
+      const totalCount = parseInt(countResult.count);
+
+      //calculate total pages
+      const totalPages = Math.ceil(totalCount / limit);
+      return {
+        bills,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+      };
     } catch (error) {
       throw error;
     }

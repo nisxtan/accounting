@@ -66,15 +66,21 @@ class BillController {
 
   async getAllBills(req, res, next) {
     try {
-      const { customerName, isTaxable, minTotal, maxTotal } = req.query;
+      const { customerName, isTaxable, minTotal, maxTotal, page, limit } =
+        req.query;
       const result = await billService.getAllBills({
         customerName,
         isTaxable,
         minTotal,
         maxTotal,
+        page: page,
+        limit: limit,
       });
       // console.log(bills);
-      res.json(result);
+      res.json({
+        result: result.bills,
+        pagination: result.pagination,
+      });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
