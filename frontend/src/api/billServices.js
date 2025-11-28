@@ -45,7 +45,7 @@ const billService = {
       if (filters.maxTotal) queryParams.append("maxTotal", filters.maxTotal);
       //add pagination
       const page = pagination.page || 1;
-      const limit = pagination.limit || 10;
+      const limit = pagination.limit || 5;
 
       queryParams.append("page", page);
       queryParams.append("limit", limit);

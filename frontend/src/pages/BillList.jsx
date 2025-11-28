@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import billService from "../api/billServices";
+import Pagination from "@mui/material/Pagination";
+import Stack from "@mui/material/Stack";
 
 const BillList = () => {
   const [bills, setBills] = useState([]);
@@ -12,22 +14,49 @@ const BillList = () => {
     minTotal: "",
     maxTotal: "",
   });
+  //pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 5,
+    totalCount: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false,
+  });
   const [debouncedFilters, setDebouncedFilters] = useState(filters);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedFilters(filters);
+      setPagination((prev) => ({ ...prev, page: 1 }));
     }, 700);
+
     return () => clearTimeout(timer);
   }, [filters]);
+
   useEffect(() => {
-    fetchBill();
-  }, [debouncedFilters]);
-  const fetchBill = async () => {
+    fetchBills();
+  }, [debouncedFilters, pagination.page, pagination.limit]);
+
+  const fetchBills = async () => {
     try {
       setLoading(true);
-      const response = await billService.getAllBills(debouncedFilters);
+      const response = await billService.getAllBills(debouncedFilters, {
+        page: pagination.page,
+        limit: pagination.limit,
+      });
 
-      setBills(response || []);
+      setBills(response.result || response || []);
+      setPagination(
+        response.pagination || {
+          page: 1,
+          limit: 5,
+          totalCount: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrev: false,
+        }
+      );
     } catch (error) {
       setError("Failed to load bills");
       console.error("Failed to fetch bills", error);
@@ -35,6 +64,7 @@ const BillList = () => {
       setLoading(false);
     }
   };
+
   const handleFilterChange = (filterName, value) => {
     setFilters((prev) => ({ ...prev, [filterName]: value }));
   };
@@ -47,9 +77,13 @@ const BillList = () => {
       maxTotal: "",
     });
   };
-
+  //pagination handler
+  const handlePageChange = (event, newPage) => {
+    setPagination((prev) => ({ ...prev, page: newPage }));
+  };
   if (loading) return <div className="p-4">Loading Bills...</div>;
   if (error) return <div className="p-4 text-red-600">{error}</div>;
+
   return (
     <>
       {/* Filters Section */}
@@ -125,7 +159,7 @@ const BillList = () => {
         </div>
       </div>
 
-      {/* Table (same as before) */}
+      {/* Table */}
       <div className="w-full overflow-x-auto p-4">
         <table className="w-full border-collapse">
           <thead>
@@ -149,7 +183,21 @@ const BillList = () => {
             ))}
           </tbody>
         </table>
-
+        {/* //pagination design */}
+        {pagination.totalPages > 0 && (
+          <div className="mt-6 flex justify-center">
+            <Stack spacing={2}>
+              <Pagination
+                count={pagination.totalPages}
+                page={pagination.page}
+                onChange={handlePageChange}
+                color="primary"
+                showFirstButton
+                showLastButton
+              />
+            </Stack>
+          </div>
+        )}
         <div className="mt-4 text-sm text-gray-600">
           Showing {bills.length} bills
         </div>
