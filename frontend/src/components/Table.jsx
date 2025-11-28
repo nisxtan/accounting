@@ -8,7 +8,6 @@ const Table = ({
   onUpdateItem,
   onRemoveRow,
   onAddRow,
-  onAddProduct,
 }) => {
   const handleInputChange = (id, field, value) => {
     if (field === "unit") {

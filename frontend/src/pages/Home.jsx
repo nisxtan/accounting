@@ -16,8 +16,10 @@ import Table from "../components/Table";
 import { useBill } from "../hooks/useBill";
 import { useState } from "react";
 import AddProductModal from "../components/AddProductModal";
-
+import { Link, Navigate, useNavigate } from "react-router-dom";
+// import useNavigate from "react-router-dom";
 const Home = () => {
+  const navigate = useNavigate();
   const {
     items,
     products,
@@ -264,14 +266,28 @@ const Home = () => {
           onChange={(e) => updateBillData("customer", e.target.value)}
         />
       </div>
-      <div className="px-4">
-        <button
-          onClick={handleAddProductClick}
-          className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 mb-4"
-        >
-          + Add New Product
-        </button>
+      <div className="flex gap-0 justify-end">
+        <div className="px-4">
+          <button
+            onClick={handleAddProductClick}
+            className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 mb-4"
+          >
+            + Add New Product
+          </button>
+        </div>
+
+        <div className="px-4">
+          <a
+            href="/list"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 mb-4 inline-block rounded"
+          >
+            View Bills list
+          </a>
+        </div>
       </div>
+
       <div>
         <Table
           items={items}

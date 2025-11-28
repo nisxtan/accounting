@@ -9,6 +9,6 @@ billRouter.get("/invoice", billController.getNewInvoiceNumber);
 //create the bill
 billRouter.post("/", billController.createBill);
 
-// billRouter.get("/invoice", billController.getInvoice);
-
+//get all bills
+billRouter.get("/", billController.getAllBills);
 module.exports = billRouter;

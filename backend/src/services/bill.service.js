@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const { AppDataSource } = require("../config/database");
 const Product = require("../entity/Product");
 const SaleItem = require("../entity/Sale-Item");
@@ -188,114 +189,6 @@ class BillService {
     }
   }
 
-  // async generateInvoiceNumber() {
-  //   const reservationRepository =
-  //     AppDataSource.getRepository("InvoiceReservation");
-
-  //   try {
-  //     // Use PostgreSQL's NOW() function to calculate 10 minutes ago
-  //     const expiredReservations = await reservationRepository
-  //       .createQueryBuilder("reservation")
-  //       .where("reservation.inProgress = :inProgress", { inProgress: true })
-  //       .andWhere("reservation.isUsed = :isUsed", { isUsed: false })
-  //       .andWhere("reservation.lastUsed < NOW() - INTERVAL '10 minutes'") // ⭐ PostgreSQL time check
-  //       .getMany();
-
-  //     // If there are expired reservations, use the first one
-  //     if (expiredReservations.length > 0) {
-  //       const expiredReservation = expiredReservations[0];
-  //       expiredReservation.lastUsed = new Date();
-  //       const updated = await reservationRepository.save(expiredReservation);
-  //       console.log("🔄 Reused expired reservation:", updated.invoiceNumber);
-  //       return updated.invoiceNumber;
-  //     }
-
-  //     // Find the highest invoice number
-  //     const lastReservation = await reservationRepository
-  //       .createQueryBuilder("reservation")
-  //       .select("reservation.invoiceNumber")
-  //       .orderBy("reservation.invoiceNumber", "DESC")
-  //       .getOne();
-
-  //     let startNumber = 1;
-  //     if (lastReservation) {
-  //       const lastNum = parseInt(lastReservation.invoiceNumber.split("-")[1]);
-  //       startNumber = lastNum + 1;
-  //     }
-
-  //     // Find available number
-  //     let checkNumber = startNumber;
-  //     while (true) {
-  //       const newInvoiceNumber = `INV-${String(checkNumber).padStart(4, "0")}`;
-
-  //       // Check if number exists and is available
-  //       const foundReservation = await reservationRepository.findOne({
-  //         where: { invoiceNumber: newInvoiceNumber },
-  //       });
-
-  //       if (!foundReservation) {
-  //         // Create new reservation
-  //         const newReservation = reservationRepository.create({
-  //           invoiceNumber: newInvoiceNumber,
-  //           inProgress: true,
-  //           isUsed: false,
-  //           lastUsed: new Date(),
-  //         });
-  //         const saved = await reservationRepository.save(newReservation);
-  //         console.log("🆕 Created new reservation:", saved.invoiceNumber);
-  //         return saved.invoiceNumber;
-  //       }
-
-  //       // If reservation exists but is available
-  //       if (!foundReservation.inProgress && !foundReservation.isUsed) {
-  //         foundReservation.inProgress = true;
-  //         foundReservation.lastUsed = new Date();
-  //         const updated = await reservationRepository.save(foundReservation);
-  //         console.log(
-  //           "📝 Activated available reservation:",
-  //           updated.invoiceNumber
-  //         );
-  //         return updated.invoiceNumber;
-  //       }
-
-  //       checkNumber++;
-  //     }
-  //   } catch (error) {
-  //     console.error("Error generating invoice number:", error);
-  //     return `INV-${Date.now()}`;
-  //   }
-  // }
-
-  // async markInvoiceNumberAsUsed(invoiceNumber) {
-  //   const reservationRepo = AppDataSource.getRepository("InvoiceReservation");
-
-  //   try {
-  //     console.log("🔍 Marking invoice as used:", invoiceNumber);
-
-  //     const result = await reservationRepo
-  //       .createQueryBuilder()
-  //       .update()
-  //       .set({
-  //         isUsed: true,
-  //         inProgress: false,
-  //         lastUsed: () => "NOW()",
-  //       })
-  //       .where("invoiceNumber = :invoiceNumber", { invoiceNumber })
-  //       .andWhere("isUsed = false")
-  //       .execute();
-
-  //     if (result.affected > 0) {
-  //       console.log("✅ Successfully marked as used:", invoiceNumber);
-  //     } else {
-  //       console.log("⚠️ Invoice already used or not found:", invoiceNumber);
-  //     }
-  //   } catch (error) {
-  //     console.error("Error marking invoice as used:", error);
-  //   }
-  // }
-
-  // Replace your generateInvoiceNumber and markInvoiceNumberAsUsed methods with these:
-
   async generateInvoiceNumber() {
     const reservationRepository =
       AppDataSource.getRepository("InvoiceReservation");
@@ -391,6 +284,50 @@ class BillService {
       }
     } catch (error) {
       console.error("Error marking invoice as used:", error);
+      throw error;
+    }
+  }
+  async getAllBills(filters = {}) {
+    try {
+      const billRepository = AppDataSource.getRepository("SalesBill");
+      const queryBuilder = billRepository
+        .createQueryBuilder("bill")
+        .leftJoinAndSelect("bill.items", "items")
+        .leftJoinAndSelect("items.product", "product")
+        .orderBy("bill.createdAt", "DESC");
+
+      // Customer name filter
+      if (filters.customerName) {
+        queryBuilder.andWhere("bill.customer ILIKE :customerName", {
+          customerName: `%${filters.customerName}%`,
+        });
+      }
+
+      // isTaxable filter
+      if (filters.isTaxable !== undefined) {
+        if (filters.isTaxable === "true") {
+          queryBuilder.andWhere("bill.taxableTotal > 0");
+        } else if (filters.isTaxable === "false") {
+          queryBuilder.andWhere("bill.taxableTotal = 0");
+        }
+      }
+
+      // Total amount range filter
+      if (filters.minTotal && !isNaN(filters.minTotal)) {
+        queryBuilder.andWhere("bill.grandTotal >= :minTotal", {
+          minTotal: Number(filters.minTotal),
+        });
+      }
+
+      if (filters.maxTotal && !isNaN(filters.maxTotal)) {
+        queryBuilder.andWhere("bill.grandTotal <= :maxTotal", {
+          maxTotal: Number(filters.maxTotal),
+        });
+      }
+
+      const bills = await queryBuilder.getMany();
+      return bills;
+    } catch (error) {
       throw error;
     }
   }

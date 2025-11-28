@@ -63,6 +63,22 @@ class BillController {
       next(error);
     }
   }
+
+  async getAllBills(req, res, next) {
+    try {
+      const { customerName, isTaxable, minTotal, maxTotal } = req.query;
+      const result = await billService.getAllBills({
+        customerName,
+        isTaxable,
+        minTotal,
+        maxTotal,
+      });
+      // console.log(bills);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  }
 }
 
 module.exports = new BillController();
