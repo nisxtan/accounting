@@ -279,7 +279,7 @@ const Home = () => {
         <div className="px-4">
           <a
             href="/list"
-            target="_blank"
+            target="_self"
             rel="noopener noreferrer"
             className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 mb-4 inline-block rounded"
           >

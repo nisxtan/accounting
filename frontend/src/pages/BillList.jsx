@@ -10,7 +10,7 @@ const BillList = () => {
 
   const [filters, setFilters] = useState({
     customerName: "",
-    isTaxable: "",
+    // isTaxable: "",
     minTotal: "",
     maxTotal: "",
   });
@@ -100,7 +100,7 @@ const BillList = () => {
   const clearFilters = () => {
     setFilters({
       customerName: "",
-      isTaxable: "",
+      // isTaxable: "",
       minTotal: "",
       maxTotal: "",
     });
@@ -139,7 +139,7 @@ const BillList = () => {
           />
         </div>
 
-        <div>
+        {/* <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Taxable
           </label>
@@ -154,7 +154,7 @@ const BillList = () => {
             <option value="true">Taxable</option>
             <option value="false">Non-Taxable</option>
           </select>
-        </div>
+        </div> */}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
