@@ -1,5 +1,6 @@
 import React from "react";
 import { AiFillDelete } from "react-icons/ai";
+import ProductSelect from "./ProductSelect";
 
 const Table = ({
   items,
@@ -59,11 +60,12 @@ const Table = ({
               {/* PRODUCT */}
               <td className="p-2">
                 <div className="flex gap-2">
-                  <select
-                    value={item.productId}
-                    onChange={(e) => {
-                      const productId = e.target.value;
+                  <ProductSelect
+                    products={products}
+                    value={item.productId || ""}
+                    onChange={(productId) => {
                       handleInputChange(item.id, "productId", productId);
+
                       if (productId) {
                         handleInputChange(
                           item.id,
@@ -72,15 +74,7 @@ const Table = ({
                         );
                       }
                     }}
-                    className="flex-1 border border-black-300 rounded px-2 py-1"
-                  >
-                    <option value="">Select Product</option>
-                    {products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
               </td>
 
