@@ -15,13 +15,9 @@ const BillList = () => {
     maxTotal: "",
   });
 
-  // TRACK WHICH FIELD IS ACTIVE
   const [activeField, setActiveField] = useState(null);
-
-  //  Track cursor position
   const cursorPositionRef = useRef(null);
 
-  // INPUT REFS
   const inputRefs = {
     customerName: useRef(null),
     isTaxable: useRef(null),
@@ -29,7 +25,6 @@ const BillList = () => {
     maxTotal: useRef(null),
   };
 
-  // PAGINATION
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 5,
@@ -41,7 +36,6 @@ const BillList = () => {
 
   const [debouncedFilters, setDebouncedFilters] = useState(filters);
 
-  // debounce only - don't restore focus here
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedFilters(filters);
@@ -51,13 +45,11 @@ const BillList = () => {
     return () => clearTimeout(timer);
   }, [filters]);
 
-  // Restore focus AFTER data finishes loading
   useEffect(() => {
     if (!loading && activeField && inputRefs[activeField]?.current) {
       const input = inputRefs[activeField].current;
       input.focus();
 
-      // Restore cursor position for text inputs
       if (cursorPositionRef.current !== null && input.setSelectionRange) {
         input.setSelectionRange(
           cursorPositionRef.current,
@@ -65,9 +57,8 @@ const BillList = () => {
         );
       }
     }
-  }, [loading, bills]); // Triggers after data loads
+  }, [loading, bills]);
 
-  // FETCH DATA
   useEffect(() => {
     fetchBills();
   }, [debouncedFilters, pagination.page, pagination.limit]);
@@ -100,11 +91,9 @@ const BillList = () => {
   };
 
   const handleFilterChange = (filterName, value) => {
-    //save cursor position before updating
     if (inputRefs[filterName]?.current) {
       cursorPositionRef.current = inputRefs[filterName].current.selectionStart;
     }
-
     setFilters((prev) => ({ ...prev, [filterName]: value }));
   };
 
@@ -129,7 +118,6 @@ const BillList = () => {
     <>
       {/* Filters Section */}
       <div className="p-4 bg-white border-b grid grid-cols-1 md:grid-cols-5 gap-4">
-        {/* Customer Name */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Customer Name
@@ -138,7 +126,6 @@ const BillList = () => {
             ref={inputRefs.customerName}
             onFocus={() => setActiveField("customerName")}
             onBlur={() => {
-              // Save cursor position on blur
               if (inputRefs.customerName.current) {
                 cursorPositionRef.current =
                   inputRefs.customerName.current.selectionStart;
@@ -152,7 +139,6 @@ const BillList = () => {
           />
         </div>
 
-        {/* Taxable */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Taxable
@@ -170,7 +156,6 @@ const BillList = () => {
           </select>
         </div>
 
-        {/* Min Total */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Min Total
@@ -193,7 +178,6 @@ const BillList = () => {
           />
         </div>
 
-        {/* Max Total */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Max Total
@@ -216,7 +200,6 @@ const BillList = () => {
           />
         </div>
 
-        {/* Clear Filters */}
         <div className="flex items-end">
           <button
             onClick={clearFilters}
@@ -227,45 +210,164 @@ const BillList = () => {
         </div>
       </div>
 
-      {/* Loading State */}
       {loading && (
         <div className="p-4 text-center text-gray-500">Loading Bills...</div>
       )}
 
       {/* Table */}
       <div className="w-full overflow-x-auto p-4">
-        <table className="w-full border-collapse">
+        <table className="w-full border-collapse border border-gray-300">
           <thead>
-            <tr className="bg-gray-500 text-left text-sm font-semibold">
-              <th className="p-2">INV #</th>
-              <th className="p-2">CUSTOMER</th>
-              <th className="p-2">DATE OF SALE</th>
-              <th className="p-2">TAXABLE</th>
-              <th className="p-2">TOTAL</th>
+            <tr className="bg-gray-700 text-white text-left text-xs font-semibold">
+              <th className="p-2 border border-gray-400">Invoice #</th>
+              <th className="p-2 border border-gray-400">Customer</th>
+              <th className="p-2 border border-gray-400">Date</th>
+              <th className="p-2 border border-gray-400">Product</th>
+              <th className="p-2 border border-gray-400">Qty</th>
+              <th className="p-2 border border-gray-400">Unit</th>
+              <th className="p-2 border border-gray-400">Rate</th>
+              <th className="p-2 border border-gray-400">Item Disc%</th>
+              <th className="p-2 border border-gray-400">Taxable</th>
+              <th className="p-2 border border-gray-400">Item Total</th>
+              <th className="p-2 border border-gray-400">Bill Disc%</th>
+              <th className="p-2 border border-gray-400">VAT%</th>
+              <th className="p-2 border border-gray-400">Grand Total</th>
             </tr>
           </thead>
           <tbody>
             {bills.length === 0 ? (
               <tr>
-                <td colSpan="5" className="p-4 text-center text-gray-500">
+                <td
+                  colSpan="13"
+                  className="p-4 text-center text-gray-500 border"
+                >
                   No bills found
                 </td>
               </tr>
             ) : (
-              bills.map((item) => (
-                <tr
-                  key={item.invoiceNumber}
-                  className="border-b hover:bg-gray-50"
-                >
-                  <td className="p-2">{item.invoiceNumber}</td>
-                  <td className="p-2">{item.customer}</td>
-                  <td className="p-2">{item.salesDate}</td>
-                  <td className="p-2">
-                    {item.taxableTotal > 0 ? "Yes" : "No"}
-                  </td>
-                  <td className="p-2">{item.grandTotal}</td>
-                </tr>
-              ))
+              bills.map((bill) => {
+                const items = bill.items || [];
+
+                if (items.length === 0) {
+                  // If no items, show bill info with empty product columns
+                  return (
+                    <tr
+                      key={bill.invoiceNumber}
+                      className="border-b hover:bg-gray-50"
+                    >
+                      <td className="p-2 border border-gray-300 font-medium">
+                        {bill.invoiceNumber}
+                      </td>
+                      <td className="p-2 border border-gray-300">
+                        {bill.customer}
+                      </td>
+                      <td className="p-2 border border-gray-300">
+                        {new Date(bill.salesDate).toLocaleDateString()}
+                      </td>
+                      <td
+                        className="p-2 border border-gray-300 text-gray-400 italic"
+                        colSpan="7"
+                      >
+                        No items
+                      </td>
+                      <td className="p-2 border border-gray-300 text-center">
+                        {bill.discountPercent}%
+                      </td>
+                      <td className="p-2 border border-gray-300 text-center">
+                        {bill.vatPercent}%
+                      </td>
+                      <td className="p-2 border border-gray-300 font-bold text-green-700">
+                        Rs. {bill.grandTotal?.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                }
+
+                // Render one row per product
+                return items.map((item, idx) => (
+                  <tr
+                    key={`${bill.invoiceNumber}-${idx}`}
+                    className={`border-b hover:bg-gray-50 ${
+                      idx > 0 ? "bg-gray-50" : ""
+                    }`}
+                  >
+                    {/* Show bill info only in first row */}
+                    {idx === 0 ? (
+                      <>
+                        <td
+                          className="p-2 border border-gray-300 font-medium align-top"
+                          rowSpan={items.length}
+                        >
+                          {bill.invoiceNumber}
+                        </td>
+                        <td
+                          className="p-2 border border-gray-300 align-top"
+                          rowSpan={items.length}
+                        >
+                          {bill.customer}
+                        </td>
+                        <td
+                          className="p-2 border border-gray-300 align-top"
+                          rowSpan={items.length}
+                        >
+                          {new Date(bill.salesDate).toLocaleDateString()}
+                        </td>
+                      </>
+                    ) : null}
+
+                    {/* Product details - shown in every row */}
+                    <td className="p-2 border border-gray-300">
+                      {item.product?.name || "N/A"}
+                    </td>
+                    <td className="p-2 border border-gray-300 text-right">
+                      {item.quantity}
+                    </td>
+                    <td className="p-2 border border-gray-300 text-center">
+                      {item.unit}
+                    </td>
+                    <td className="p-2 border border-gray-300 text-right">
+                      Rs. {item.rate?.toFixed(2)}
+                    </td>
+                    <td className="p-2 border border-gray-300 text-center text-red-600">
+                      {item.discountPercent}%
+                    </td>
+                    <td className="p-2 border border-gray-300 text-center">
+                      {item.isTaxable ? (
+                        <span className="text-green-600 font-bold">✓</span>
+                      ) : (
+                        <span className="text-gray-400">✗</span>
+                      )}
+                    </td>
+                    <td className="p-2 border border-gray-300 text-right font-medium">
+                      Rs. {(item.individualRate * item.quantity).toFixed(2)}
+                    </td>
+
+                    {/* Bill totals - shown only in first row */}
+                    {idx === 0 ? (
+                      <>
+                        <td
+                          className="p-2 border border-gray-300 text-center align-top"
+                          rowSpan={items.length}
+                        >
+                          {bill.discountPercent}%
+                        </td>
+                        <td
+                          className="p-2 border border-gray-300 text-center align-top"
+                          rowSpan={items.length}
+                        >
+                          {bill.vatPercent}%
+                        </td>
+                        <td
+                          className="p-2 border border-gray-300 font-bold text-green-700 text-right align-top"
+                          rowSpan={items.length}
+                        >
+                          Rs. {bill.grandTotal?.toFixed(2)}
+                        </td>
+                      </>
+                    ) : null}
+                  </tr>
+                ));
+              })
             )}
           </tbody>
         </table>
@@ -287,7 +389,9 @@ const BillList = () => {
         )}
 
         <div className="mt-4 text-sm text-gray-600">
-          Showing {bills.length} of {pagination.totalCount} bills
+          Showing {bills.length} bills with{" "}
+          {bills.reduce((sum, b) => sum + (b.items?.length || 0), 0)} total
+          items
         </div>
       </div>
     </>
