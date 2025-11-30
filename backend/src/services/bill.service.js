@@ -1,4 +1,3 @@
-const { Op } = require("sequelize");
 const { AppDataSource } = require("../config/database");
 const Product = require("../entity/Product");
 const SaleItem = require("../entity/Sale-Item");
@@ -77,6 +76,24 @@ class BillService {
       if (salesDate > today) {
         throw new Error("Sales date cannot be in the future");
       }
+
+      const invoiceNumber = billData.invoiceNumber;
+
+      const reservationRepo = AppDataSource.getRepository("InvoiceReservation");
+      const reservation = await reservationRepo.findOne({
+        where: { invoiceNumber: invoiceNumber },
+      });
+
+      if (!reservation) {
+        throw new Error(`Invoice number ${invoiceNumber} does not exist`);
+      }
+
+      if (reservation.isUsed) {
+        throw new Error(
+          `Invoice number ${invoiceNumber} has already been used`
+        );
+      }
+
       // validate all products exist BEFORE starting transaction
       const productRepository = queryRunner.manager.getRepository(Product);
 
@@ -104,8 +121,6 @@ class BillService {
         }
       }
 
-      // Generate invoice number
-      const invoiceNumber = billData.invoiceNumber;
       // Calculate totals
       const totals = this.calculateBillTotals(
         billData.items,
@@ -130,7 +145,7 @@ class BillService {
       });
       const savedBill = await billRepository.save(bill);
 
-      await this.markInvoiceNumberAsUsed(billData.invoiceNumber);
+      await this.markInvoiceNumberAsUsed(invoiceNumber);
 
       // Create sales items and update product quantities
       const itemRepository = queryRunner.manager.getRepository(SaleItem);
@@ -145,8 +160,8 @@ class BillService {
 
         //Explicitly set productId and billId
         const salesItem = itemRepository.create({
-          productId: itemData.productId, // Explicit foreign key
-          billId: savedBill.id, // Explicit foreign key
+          productId: itemData.productId,
+          billId: savedBill.id,
           quantity: itemData.quantity,
           unit: itemData.unit,
           baseQuantity: baseQuantity,
@@ -158,8 +173,8 @@ class BillService {
           discountAmount: calculatedItem.discountAmount,
           billDiscountAmount: calculatedItem.billDiscountAmount,
           total: calculatedItem.afterVat,
-          product: { id: itemData.productId }, //set relation
-          bill: savedBill, // set relation
+          product: { id: itemData.productId },
+          bill: savedBill,
         });
 
         await itemRepository.save(salesItem);
@@ -200,11 +215,12 @@ class BillService {
         .update()
         .set({
           inProgress: false,
+          // isUsed: true,
           lastUsed: () => "NOW()",
         })
         .where("inProgress = :inProgress", { inProgress: true })
         .andWhere("isUsed = :isUsed", { isUsed: false })
-        .andWhere("lastUsed < NOW() - INTERVAL '10 minutes'")
+        .andWhere("lastUsed < NOW() - INTERVAL '2 minutes'")
         .execute();
 
       //Try to find an available reservation (not in progress, not used)
@@ -224,7 +240,7 @@ class BillService {
         return updated.invoiceNumber;
       }
 
-      // Step 3: If no available reservation, create a new one
+      //If no available reservation, create a new one
       // Find the highest invoice number
       const lastReservation = await reservationRepository
         .createQueryBuilder("reservation")
@@ -249,7 +265,7 @@ class BillService {
       });
 
       const saved = await reservationRepository.save(newReservation);
-      console.log("🆕 Created new reservation:", saved.invoiceNumber);
+      console.log("Created new reservation:", saved.invoiceNumber);
       return saved.invoiceNumber;
     } catch (error) {
       console.error("Error generating invoice number:", error);
@@ -262,7 +278,7 @@ class BillService {
     const reservationRepo = AppDataSource.getRepository("InvoiceReservation");
 
     try {
-      console.log("🔍 Marking invoice as used:", invoiceNumber);
+      // console.log("🔍 Marking invoice as used:", invoiceNumber);
 
       const result = await reservationRepo
         .createQueryBuilder()
@@ -276,10 +292,10 @@ class BillService {
         .execute();
 
       if (result.affected > 0) {
-        console.log("✅ Successfully marked as used:", invoiceNumber);
+        // console.log("✅ Successfully marked as used:", invoiceNumber);
         return true;
       } else {
-        console.log("⚠️ Invoice not found:", invoiceNumber);
+        // console.log("⚠️ Invoice not found:", invoiceNumber);
         return false;
       }
     } catch (error) {
@@ -294,7 +310,7 @@ class BillService {
         .createQueryBuilder("bill")
         .leftJoinAndSelect("bill.items", "items")
         .leftJoinAndSelect("items.product", "product")
-        .orderBy("bill.createdAt", "DESC");
+        .orderBy("bill.invoiceNumber", "ASC");
 
       // Customer name filter
       if (filters.customerName) {
