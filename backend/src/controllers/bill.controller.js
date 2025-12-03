@@ -17,7 +17,6 @@ class BillController {
       const savedBill = await billService.createCompleteBill(billData);
 
       res.status(201).json({
-        
         message: "Bill created successfully",
         bill: savedBill,
       });
@@ -38,13 +37,19 @@ class BillController {
         page: page,
         limit: limit,
       });
-      // console.log(bills);
-      res.json({
-        result: result.bills,
-        pagination: result.pagination,
-      });
+
+      res.json(result);
     } catch (err) {
       res.status(500).json({ error: err.message });
+    }
+  }
+  async getBillDetails(req, res) {
+    try {
+      const { invoiceNumber } = req.params;
+      const bill = await billService.getBillWithDetails(invoiceNumber);
+      res.json(bill);
+    } catch (error) {
+      res.status(404).json({ error: error.message });
     }
   }
 }

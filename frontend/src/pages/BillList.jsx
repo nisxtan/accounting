@@ -7,23 +7,12 @@ const BillList = () => {
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
+  const [printingBill, setPrintingBill] = useState(null);
   const [filters, setFilters] = useState({
     customerName: "",
-    // isTaxable: "",
     minTotal: "",
     maxTotal: "",
   });
-
-  const [activeField, setActiveField] = useState(null);
-  const cursorPositionRef = useRef(null);
-
-  const inputRefs = {
-    customerName: useRef(null),
-    isTaxable: useRef(null),
-    minTotal: useRef(null),
-    maxTotal: useRef(null),
-  };
 
   const [pagination, setPagination] = useState({
     page: 1,
@@ -33,8 +22,16 @@ const BillList = () => {
     hasNext: false,
     hasPrev: false,
   });
-
   const [debouncedFilters, setDebouncedFilters] = useState(filters);
+  const [activeField, setActiveField] = useState(null);
+  const cursorPositionRef = useRef(null);
+
+  const inputRefs = {
+    customerName: useRef(null),
+    isTaxable: useRef(null),
+    minTotal: useRef(null),
+    maxTotal: useRef(null),
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -71,7 +68,35 @@ const BillList = () => {
         limit: pagination.limit,
       });
 
-      setBills(response.result || response || []);
+      console.log("Full Response from API:", response); // Debug log
+      console.log("Response keys:", Object.keys(response)); // Show all keys
+      console.log("response.result type:", typeof response.result);
+      console.log("response.result is array?", Array.isArray(response.result));
+      console.log("response.result content:", response.result);
+
+      // Handle different response structures
+      let billsData = [];
+      if (Array.isArray(response)) {
+        billsData = response;
+      } else if (response.result && Array.isArray(response.result)) {
+        billsData = response.result;
+      } else if (response.results && Array.isArray(response.results)) {
+        billsData = response.results;
+      } else if (response.data && Array.isArray(response.data)) {
+        billsData = response.data;
+      } else if (response.bills && Array.isArray(response.bills)) {
+        billsData = response.bills;
+      } else {
+        console.error(
+          "⚠️ Bills array not found in response! Response structure:",
+          response
+        );
+      }
+
+      console.log("Extracted bills data:", billsData);
+      console.log("Bills count:", billsData.length);
+
+      setBills(billsData);
       setPagination(
         response.pagination || {
           page: 1,
@@ -85,6 +110,7 @@ const BillList = () => {
     } catch (error) {
       setError("Failed to load bills");
       console.error("Failed to fetch bills", error);
+      setBills([]); // Ensure bills is always an array
     } finally {
       setLoading(false);
     }
@@ -100,7 +126,6 @@ const BillList = () => {
   const clearFilters = () => {
     setFilters({
       customerName: "",
-      // isTaxable: "",
       minTotal: "",
       maxTotal: "",
     });
@@ -110,6 +135,182 @@ const BillList = () => {
 
   const handlePageChange = (event, newPage) => {
     setPagination((prev) => ({ ...prev, page: newPage }));
+  };
+
+  const handlePrintBill = async (bill) => {
+    try {
+      setPrintingBill(bill.invoiceNumber);
+
+      // If bill already has items (from current API), use them
+      // Otherwise fetch from new API
+      if (bill.items && bill.items.length > 0) {
+        printBillDetails(bill);
+      } else {
+        const detailedBill = await billService.getBillDetails(
+          bill.invoiceNumber
+        );
+        printBillDetails(detailedBill);
+      }
+    } catch (error) {
+      alert(`Print failed: ${error.message || "Failed to fetch bill details"}`);
+    } finally {
+      setPrintingBill(null);
+    }
+  };
+
+  const printBillDetails = (bill) => {
+    const printWindow = window.open("", "_blank");
+
+    if (!printWindow) {
+      alert("Please allow pop-ups to print the bill");
+      return;
+    }
+
+    const items = bill.items || [];
+
+    const itemsHTML = items
+      .map(
+        (item, index) => `
+      <tr>
+        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${
+          index + 1
+        }</td>
+        <td style="border: 1px solid #000; padding: 8px;">${
+          item.product?.name || "N/A"
+        }</td>
+        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${
+          item.quantity
+        }</td>
+        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${
+          item.unit
+        }</td>
+        <td style="border: 1px solid #000; padding: 8px; text-align: right;">Rs. ${item.rate.toFixed(
+          2
+        )}</td>
+        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${
+          item.discountPercent
+        }%</td>
+        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${
+          item.isTaxable ? "Yes" : "No"
+        }</td>
+        <td style="border: 1px solid #000; padding: 8px; text-align: right;">Rs. ${
+          item.unit === "dozen"
+            ? (item.individualRate * 12).toFixed(2)
+            : item.unit === "box"
+            ? (item.individualRate * 6).toFixed(2)
+            : (item.individualRate * item.quantity).toFixed(2)
+        }</td>
+      </tr>
+    `
+      )
+      .join("");
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice ${bill.invoiceNumber}</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+          }
+          .invoice-info {
+            margin-bottom: 20px;
+          }
+          .invoice-info div {
+            margin: 5px 0;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+          }
+          th {
+            background-color: #333;
+            color: white;
+            padding: 10px;
+            border: 1px solid #000;
+            text-align: left;
+          }
+          .totals {
+            margin-top: 20px;
+            text-align: right;
+          }
+          .totals div {
+            margin: 5px 0;
+            font-size: 14px;
+          }
+          .grand-total {
+            font-size: 18px;
+            font-weight: bold;
+            color: #006400;
+            margin-top: 10px;
+          }
+          @media print {
+            body { margin: 0; padding: 10px; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>SALES INVOICE</h1>
+        </div>
+        
+        <div class="invoice-info">
+          <div><strong>Invoice Number:</strong> ${bill.invoiceNumber}</div>
+          <div><strong>Customer:</strong> ${bill.customer}</div>
+          <div><strong>Date:</strong> ${new Date(
+            bill.salesDate
+          ).toLocaleDateString()}</div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align: center;">S.N.</th>
+              <th>Product</th>
+              <th style="text-align: center;">Qty</th>
+              <th style="text-align: center;">Unit</th>
+              <th style="text-align: right;">Rate</th>
+              <th style="text-align: center;">Disc%</th>
+              <th style="text-align: center;">Taxable</th>
+              <th style="text-align: right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              itemsHTML ||
+              '<tr><td colspan="8" style="text-align: center; padding: 20px;">No items</td></tr>'
+            }
+          </tbody>
+        </table>
+
+        <div class="totals">
+          <div><strong>Bill Discount:</strong> ${bill.discountPercent}%</div>
+          <div><strong>VAT:</strong> ${bill.vatPercent}%</div>
+          <div class="grand-total">Grand Total: Rs. ${bill.grandTotal?.toFixed(
+            2
+          )}</div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 250);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   if (error) return <div className="p-4 text-red-600">{error}</div>;
@@ -138,8 +339,6 @@ const BillList = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-
-        {/* {*} */}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -207,23 +406,17 @@ const BillList = () => {
               <th className="p-2 border border-gray-400">Invoice #</th>
               <th className="p-2 border border-gray-400">Customer</th>
               <th className="p-2 border border-gray-400">Date</th>
-              <th className="p-2 border border-gray-400">Product</th>
-              <th className="p-2 border border-gray-400">Qty</th>
-              <th className="p-2 border border-gray-400">Unit</th>
-              <th className="p-2 border border-gray-400">Rate</th>
-              <th className="p-2 border border-gray-400">Item Disc%</th>
-              <th className="p-2 border border-gray-400">Taxable</th>
-              <th className="p-2 border border-gray-400">Item Total</th>
-              <th className="p-2 border border-gray-400">Bill Disc%</th>
+              <th className="p-2 border border-gray-400">Disc%</th>
               <th className="p-2 border border-gray-400">VAT%</th>
               <th className="p-2 border border-gray-400">Grand Total</th>
+              <th className="p-2 border border-gray-400 text-center">Action</th>
             </tr>
           </thead>
           <tbody>
             {bills.length === 0 ? (
               <tr>
                 <td
-                  colSpan="13"
+                  colSpan="7"
                   className="p-4 text-center text-gray-500 border"
                 >
                   No bills found
@@ -232,135 +425,43 @@ const BillList = () => {
             ) : (
               bills.map((bill) => {
                 const items = bill.items || [];
-                // console.log(items);
-                if (items.length === 0) {
-                  // If no items, show bill info with empty product columns
-                  return (
-                    <tr
-                      key={bill.invoiceNumber}
-                      className="border-b hover:bg-gray-50"
-                    >
-                      <td className="p-2 border border-gray-300 font-medium">
-                        {bill.invoiceNumber}
-                      </td>
-                      <td className="p-2 border border-gray-300">
-                        {bill.customer}
-                      </td>
-                      <td className="p-2 border border-gray-300">
-                        {new Date(bill.salesDate).toLocaleDateString()}
-                      </td>
-                      <td
-                        className="p-2 border border-gray-300 text-gray-400 italic"
-                        colSpan="7"
-                      >
-                        No items
-                      </td>
-                      <td className="p-2 border border-gray-300 text-center">
-                        {bill.discountPercent}%
-                      </td>
-                      <td className="p-2 border border-gray-300 text-center">
-                        {bill.vatPercent}%
-                      </td>
-                      <td className="p-2 border border-gray-300 font-bold text-green-700">
-                        Rs. {bill.grandTotal?.toFixed(2)}
-                      </td>
-                    </tr>
-                  );
-                }
 
-                // Render one row per product
-                return items.map((item, idx) => (
+                return (
                   <tr
-                    key={`${bill.invoiceNumber}-${idx}`}
-                    className={`border-b hover:bg-gray-50 ${
-                      idx > 0 ? "bg-gray-50" : ""
-                    }`}
+                    key={bill.invoiceNumber}
+                    className="border-b hover:bg-gray-50"
                   >
-                    {/* Show bill info only in first row */}
-                    {idx === 0 ? (
-                      <>
-                        <td
-                          className="p-2 border border-gray-300 font-medium align-top"
-                          rowSpan={items.length}
-                        >
-                          {bill.invoiceNumber}
-                        </td>
-                        <td
-                          className="p-2 border border-gray-300 align-top"
-                          rowSpan={items.length}
-                        >
-                          {bill.customer}
-                        </td>
-                        <td
-                          className="p-2 border border-gray-300 align-top"
-                          rowSpan={items.length}
-                        >
-                          {new Date(bill.salesDate).toLocaleDateString()}
-                        </td>
-                      </>
-                    ) : null}
-
-                    {/* Product details - shown in every row */}
+                    <td className="p-2 border border-gray-300 font-medium">
+                      {bill.invoiceNumber}
+                    </td>
                     <td className="p-2 border border-gray-300">
-                      {item.product?.name || "N/A"}
+                      {bill.customer}
                     </td>
-                    <td className="p-2 border border-gray-300 text-right">
-                      {item.quantity}
-                    </td>
-                    <td className="p-2 border border-gray-300 text-center">
-                      {item.unit}
-                    </td>
-                    <td className="p-2 border border-gray-300 text-right">
-                      Rs. {item.rate} {/* Show the actual rate from database */}
-                      <span className="text-xs text-gray-500 ml-1">
-                        per {item.unit === "dozen" ? "dozen" : "piece"}
-                      </span>
-                    </td>
-                    <td className="p-2 border border-gray-300 text-center text-red-600">
-                      {item.discountPercent}%
+                    <td className="p-2 border border-gray-300">
+                      {new Date(bill.salesDate).toLocaleDateString()}
                     </td>
                     <td className="p-2 border border-gray-300 text-center">
-                      {item.isTaxable ? (
-                        <span className="text-green-600 font-bold">✓</span>
-                      ) : (
-                        <span className="text-gray-400">✗</span>
-                      )}
+                      {bill.discountPercent}%
                     </td>
-                    <td className="p-2 border border-gray-300 text-right font-medium">
-                      {item.unit === "dozen"
-                        ? `Rs. ${(item.individualRate * 12).toFixed(2)}`
-                        : item.unit === "box"
-                        ? `Rs. ${(item.individualRate * 6).toFixed(2)}`
-                        : `Rs. ${(item.individualRate * item.quantity).toFixed(
-                            2
-                          )}`}
+                    <td className="p-2 border border-gray-300 text-center">
+                      {bill.vatPercent}%
                     </td>
-
-                    {/* Bill totals - shown only in first row */}
-                    {idx === 0 ? (
-                      <>
-                        <td
-                          className="p-2 border border-gray-300 text-center align-top"
-                          rowSpan={items.length}
-                        >
-                          {bill.discountPercent}%
-                        </td>
-                        <td
-                          className="p-2 border border-gray-300 text-center align-top"
-                          rowSpan={items.length}
-                        >
-                          {bill.vatPercent}%
-                        </td>
-                        <td
-                          className="p-2 border border-gray-300 font-bold text-green-700 text-right align-top"
-                          rowSpan={items.length}
-                        >
-                          Rs. {bill.grandTotal?.toFixed(2)}
-                        </td>
-                      </>
-                    ) : null}
+                    <td className="p-2 border border-gray-300 font-bold text-green-700">
+                      Rs. {bill.grandTotal?.toFixed(2)}
+                    </td>
+                    <td className="p-2 border border-gray-300 text-center">
+                      <button
+                        onClick={() => handlePrintBill(bill)}
+                        disabled={printingBill === bill.invoiceNumber}
+                        className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        {printingBill === bill.invoiceNumber
+                          ? "Loading..."
+                          : "Print"}
+                      </button>
+                    </td>
                   </tr>
-                ));
+                );
               })
             )}
           </tbody>

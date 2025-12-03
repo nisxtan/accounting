@@ -21,15 +21,6 @@ const billService = {
     }
   },
 
-  // GET ALL BILLS
-  // getAll: async () => {
-  //   try {
-  //     const response = await axiosInstance.get("/bill");
-  //     return response.data;
-  //   } catch (error) {
-  //     throw error.response?.data || error.message;
-  //   }
-  // },
   getNewInvoiceNumber() {
     return axiosInstance.get("/bill/invoice");
   },
@@ -50,6 +41,16 @@ const billService = {
       queryParams.append("page", page);
       queryParams.append("limit", limit);
       const response = await axiosInstance.get(`/bill?${queryParams}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+  getBillDetails: async (invoiceNumber) => {
+    try {
+      const response = await axiosInstance.get(
+        `/bill/details/${invoiceNumber}`
+      );
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;

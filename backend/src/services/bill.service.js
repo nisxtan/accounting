@@ -308,8 +308,6 @@ class BillService {
       const billRepository = AppDataSource.getRepository("SalesBill");
       const queryBuilder = billRepository
         .createQueryBuilder("bill")
-        .leftJoinAndSelect("bill.items", "items")
-        .leftJoinAndSelect("items.product", "product")
         .orderBy("bill.invoiceNumber", "ASC");
 
       // Customer name filter
@@ -388,7 +386,7 @@ class BillService {
       //calculate total pages
       const totalPages = Math.ceil(totalCount / limit);
       return {
-        bills,
+        result: bills,
         pagination: {
           page,
           limit,
@@ -398,6 +396,23 @@ class BillService {
           hasPrev: page > 1,
         },
       };
+    } catch (error) {
+      throw error;
+    }
+  }
+  async getBillWithDetails(invoiceNumber) {
+    try {
+      const billRepository = AppDataSource.getRepository("SalesBill");
+      const bill = await billRepository
+        .createQueryBuilder("bill")
+        .leftJoinAndSelect("bill.items", "items")
+        .leftJoinAndSelect("items.product", "product")
+        .where("bill.invoiceNumber = :invoiceNumber", { invoiceNumber })
+        .getOne();
+      if (!bill) {
+        throw new Error(`bill with invoice number ${invoiceNumber} not found.`);
+      }
+      return bill;
     } catch (error) {
       throw error;
     }
