@@ -1,4 +1,6 @@
 import React from "react";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import {
   AiFillBook,
   AiFillCalendar,
@@ -181,6 +183,196 @@ const Home = () => {
     printWindow.document.write(printContent);
     printWindow.document.close();
   };
+
+  const downloadExcel = (billData, items, totals, products) => {
+    console.log("🔍 DEBUG - downloadExcel called with:", {
+      billData: billData?.invoiceNumber,
+      itemsCount: items?.length,
+      productsCount: products?.length,
+      products: products,
+    });
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+
+    // ========== INVOICE SHEET ==========
+    const invoiceData = [];
+
+    // Header Section
+    invoiceData.push(["AQUIDEN INVOICE", "", "", "", "", ""]);
+    invoiceData.push(["", "", "", "", "", ""]);
+
+    // Invoice Info
+    invoiceData.push([
+      "Invoice Number:",
+      billData.invoiceNumber,
+      "",
+      "Date:",
+      billData.salesDate,
+      "",
+    ]);
+
+    invoiceData.push([
+      "Customer:",
+      billData.customer,
+      "",
+      "Printed:",
+      new Date().toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      "",
+    ]);
+
+    invoiceData.push([""]); // Empty row
+
+    // Items Table Header
+    invoiceData.push([
+      "S.N.",
+      "Product",
+      "Quantity",
+      "Unit",
+      "Rate (Rs.)",
+      "Discount %",
+      "Taxable",
+      "Item Total (Rs.)",
+    ]);
+
+    // Items Data
+    let serial = 1;
+    items
+      .filter((item) => item.productId && item.rate > 0)
+      .forEach((item) => {
+        const product = products.find((p) => p.id == item.productId);
+        const calculatedItem = totals.calculatedItems?.find(
+          (calcItem) => calcItem.id === item.id
+        );
+
+        invoiceData.push([
+          serial++,
+          product?.name || "N/A",
+          item.quantity,
+          item.unit,
+          item.rate,
+          `${item.discountPercent}%`,
+          item.isTaxable ? "Yes" : "No",
+          calculatedItem?.finalTotal || 0,
+        ]);
+      });
+
+    invoiceData.push([""]); // Empty row
+
+    // Summary Section
+    invoiceData.push(["BILL SUMMARY", "", "", "", "", "", "", ""]);
+    invoiceData.push(["Subtotal:", "", "", "", "", "", "", totals.subTotal]);
+
+    invoiceData.push([
+      `Discount (${billData.discountPercent}%):`,
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      totals.discountAmount,
+    ]);
+
+    invoiceData.push([
+      "Taxable Amount:",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      totals.taxableTotal,
+    ]);
+
+    invoiceData.push([
+      "Non-Taxable Amount:",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      totals.nonTaxableTotal,
+    ]);
+
+    invoiceData.push([
+      `VAT (${billData.vatPercent}%):`,
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      totals.vatAmount,
+    ]);
+
+    invoiceData.push([""]); // Empty row
+
+    // Grand Total
+    invoiceData.push([
+      "GRAND TOTAL:",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      totals.grandTotal,
+    ]);
+
+    invoiceData.push([""]); // Empty row
+    invoiceData.push(["Thank you for your business!"]);
+
+    // Create worksheet
+    const ws = XLSX.utils.aoa_to_sheet(invoiceData);
+
+    // ========== FORMATTING ==========
+    // Column widths (adjust based on content)
+    const colWidths = [
+      { wch: 6 }, // S.N.
+      { wch: 25 }, // Product
+      { wch: 10 }, // Quantity
+      { wch: 8 }, // Unit
+      { wch: 12 }, // Rate
+      { wch: 12 }, // Discount %
+      { wch: 10 }, // Taxable
+      { wch: 15 }, // Item Total
+    ];
+
+    ws["!cols"] = colWidths;
+
+    // Merge cells for header
+    ws["!merges"] = [
+      // Merge header row
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+      // Merge customer row
+      { s: { r: 3, c: 1 }, e: { r: 3, c: 2 } },
+      { s: { r: 3, c: 4 }, e: { r: 3, c: 5 } },
+      // Merge thank you message
+      {
+        s: { r: invoiceData.length - 2, c: 0 },
+        e: { r: invoiceData.length - 2, c: 7 },
+      },
+    ];
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, `Invoice_${billData.invoiceNumber}`);
+
+    // ========== EXPORT ==========
+    const fileName = `Invoice_${billData.invoiceNumber}_${billData.customer}_${billData.salesDate}.xlsx`;
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+
+    saveAs(new Blob([wbout], { type: "application/octet-stream" }), fileName);
+
+    return fileName;
+  };
+
   const handleSave = async () => {
     // Validation
     if (!billData.customer || billData.customer.trim() === "") {
@@ -308,14 +500,30 @@ const Home = () => {
         />
       </div>
 
-      <div className="flex justify-end mt-4 mr-5">
-        <button
-          onClick={handleSave}
-          disabled={loading} //
-          className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
-        >
-          {loading ? "Loading..." : "Save Bill"}
-        </button>
+      <div className="flex justify-end ">
+        {" "}
+        <div className="flex justify-end mt-4 mr-5">
+          <button
+            onClick={async () => {
+              await handleSave();
+              downloadExcel(billData, items, totals, products);
+            }}
+            className="bg-cyan-800 text-white px-8 py-3 mb-3 rounded-lg text-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            {loading || !products || products.length === 0
+              ? "Loading..."
+              : "Download Excel"}
+          </button>
+        </div>
+        <div className="flex justify-end mt-4 mr-5">
+          <button
+            onClick={handleSave}
+            disabled={loading} //
+            className="bg-cyan-800 text-white px-8 py-3 mb-3 rounded-lg text-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            {loading ? "Loading..." : "Save Bill"}
+          </button>
+        </div>
       </div>
 
       <AddProductModal

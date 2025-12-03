@@ -117,6 +117,9 @@ export const useBill = () => {
         initialTotal,
         discountAmount,
         finalTotal,
+        displayRate: item.rate,
+        displayQuantity: item.quantity,
+        displayUnit: item.unit,
       };
     });
 

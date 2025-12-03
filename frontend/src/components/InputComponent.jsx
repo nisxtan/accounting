@@ -15,7 +15,7 @@ const InputComponent = ({
 }) => {
   return (
     <div
-      className={`flex-1 bg-white border border-gray-200 rounded-lg p-4 ${className}`}
+      className={`flex-1 bg-slate-300 border border-gray-200 rounded-lg p-4 ${className}`}
     >
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">

@@ -139,22 +139,7 @@ const BillList = () => {
           />
         </div>
 
-        {/* <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Taxable
-          </label>
-          <select
-            ref={inputRefs.isTaxable}
-            onFocus={() => setActiveField("isTaxable")}
-            value={filters.isTaxable}
-            onChange={(e) => handleFilterChange("isTaxable", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All</option>
-            <option value="true">Taxable</option>
-            <option value="false">Non-Taxable</option>
-          </select>
-        </div> */}
+        {/* {*} */}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -247,7 +232,7 @@ const BillList = () => {
             ) : (
               bills.map((bill) => {
                 const items = bill.items || [];
-
+                // console.log(items);
                 if (items.length === 0) {
                   // If no items, show bill info with empty product columns
                   return (
@@ -326,7 +311,10 @@ const BillList = () => {
                       {item.unit}
                     </td>
                     <td className="p-2 border border-gray-300 text-right">
-                      Rs. {item.rate?.toFixed(2)}
+                      Rs. {item.rate} {/* Show the actual rate from database */}
+                      <span className="text-xs text-gray-500 ml-1">
+                        per {item.unit === "dozen" ? "dozen" : "piece"}
+                      </span>
                     </td>
                     <td className="p-2 border border-gray-300 text-center text-red-600">
                       {item.discountPercent}%
@@ -339,7 +327,13 @@ const BillList = () => {
                       )}
                     </td>
                     <td className="p-2 border border-gray-300 text-right font-medium">
-                      Rs. {(item.individualRate * item.quantity).toFixed(2)}
+                      {item.unit === "dozen"
+                        ? `Rs. ${(item.individualRate * 12).toFixed(2)}`
+                        : item.unit === "box"
+                        ? `Rs. ${(item.individualRate * 6).toFixed(2)}`
+                        : `Rs. ${(item.individualRate * item.quantity).toFixed(
+                            2
+                          )}`}
                     </td>
 
                     {/* Bill totals - shown only in first row */}
