@@ -19,7 +19,7 @@ import { useBill } from "../hooks/useBill";
 import { useState } from "react";
 import AddProductModal from "../components/AddProductModal";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-// import useNavigate from "react-router-dom";
+
 const Home = () => {
   const navigate = useNavigate();
   const {
@@ -37,6 +37,7 @@ const Home = () => {
   } = useBill();
 
   const [productModal, setProductModal] = useState(false);
+
   const handleProductAdded = async (newProduct) => {
     await loadProducts();
     console.log("products reloaded");
@@ -60,7 +61,6 @@ const Home = () => {
     </head>
     <body class="p-8 bg-white">
       <div class="max-w-4xl mx-auto">
-        <!-- Header -->
         <div class="border-b-2 border-blue-500 pb-6 mb-6">
           <div class="flex justify-between items-start">
             <div>
@@ -83,13 +83,11 @@ const Home = () => {
           </div>
         </div>
 
-        <!-- Customer Info -->
         <div class="mb-8">
           <h2 class="text-lg font-semibold text-slate-700 mb-2">Bill To:</h2>
           <p class="text-slate-800 font-medium">${billData.customer}</p>
         </div>
 
-        <!-- Items Table -->
         <div class="mb-8">
           <h2 class="text-lg font-semibold text-slate-700 mb-4">Items</h2>
           <table class="w-full border-collapse border border-slate-300">
@@ -131,7 +129,6 @@ const Home = () => {
           </table>
         </div>
 
-        <!-- Summary -->
         <div class="border-t border-slate-300 pt-6">
           <div class="max-w-xs ml-auto">
             <div class="flex justify-between mb-2">
@@ -165,7 +162,6 @@ const Home = () => {
           </div>
         </div>
 
-        <!-- Footer -->
         <div class="mt-12 pt-6 border-t border-slate-200 text-center text-sm text-slate-400">
           Thank you for your business!
         </div>
@@ -191,17 +187,13 @@ const Home = () => {
       productsCount: products?.length,
       products: products,
     });
-    // Create workbook
-    const wb = XLSX.utils.book_new();
 
-    // ========== INVOICE SHEET ==========
+    const wb = XLSX.utils.book_new();
     const invoiceData = [];
 
-    // Header Section
     invoiceData.push(["AQUIDEN INVOICE", "", "", "", "", ""]);
     invoiceData.push(["", "", "", "", "", ""]);
 
-    // Invoice Info
     invoiceData.push([
       "Invoice Number:",
       billData.invoiceNumber,
@@ -226,9 +218,8 @@ const Home = () => {
       "",
     ]);
 
-    invoiceData.push([""]); // Empty row
+    invoiceData.push([""]);
 
-    // Items Table Header
     invoiceData.push([
       "S.N.",
       "Product",
@@ -240,7 +231,6 @@ const Home = () => {
       "Item Total (Rs.)",
     ]);
 
-    // Items Data
     let serial = 1;
     items
       .filter((item) => item.productId && item.rate > 0)
@@ -262,9 +252,8 @@ const Home = () => {
         ]);
       });
 
-    invoiceData.push([""]); // Empty row
+    invoiceData.push([""]);
 
-    // Summary Section
     invoiceData.push(["BILL SUMMARY", "", "", "", "", "", "", ""]);
     invoiceData.push(["Subtotal:", "", "", "", "", "", "", totals.subTotal]);
 
@@ -312,9 +301,8 @@ const Home = () => {
       totals.vatAmount,
     ]);
 
-    invoiceData.push([""]); // Empty row
+    invoiceData.push([""]);
 
-    // Grand Total
     invoiceData.push([
       "GRAND TOTAL:",
       "",
@@ -326,45 +314,36 @@ const Home = () => {
       totals.grandTotal,
     ]);
 
-    invoiceData.push([""]); // Empty row
+    invoiceData.push([""]);
     invoiceData.push(["Thank you for your business!"]);
 
-    // Create worksheet
     const ws = XLSX.utils.aoa_to_sheet(invoiceData);
 
-    // ========== FORMATTING ==========
-    // Column widths (adjust based on content)
     const colWidths = [
-      { wch: 6 }, // S.N.
-      { wch: 25 }, // Product
-      { wch: 10 }, // Quantity
-      { wch: 8 }, // Unit
-      { wch: 12 }, // Rate
-      { wch: 12 }, // Discount %
-      { wch: 10 }, // Taxable
-      { wch: 15 }, // Item Total
+      { wch: 6 },
+      { wch: 25 },
+      { wch: 10 },
+      { wch: 8 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 10 },
+      { wch: 15 },
     ];
 
     ws["!cols"] = colWidths;
 
-    // Merge cells for header
     ws["!merges"] = [
-      // Merge header row
       { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
-      // Merge customer row
       { s: { r: 3, c: 1 }, e: { r: 3, c: 2 } },
       { s: { r: 3, c: 4 }, e: { r: 3, c: 5 } },
-      // Merge thank you message
       {
         s: { r: invoiceData.length - 2, c: 0 },
         e: { r: invoiceData.length - 2, c: 7 },
       },
     ];
 
-    // Add worksheet to workbook
     XLSX.utils.book_append_sheet(wb, ws, `Invoice_${billData.invoiceNumber}`);
 
-    // ========== EXPORT ==========
     const fileName = `Invoice_${billData.invoiceNumber}_${billData.customer}_${billData.salesDate}.xlsx`;
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
 
@@ -374,7 +353,6 @@ const Home = () => {
   };
 
   const handleSave = async () => {
-    // Validation
     if (!billData.customer || billData.customer.trim() === "") {
       alert("Customer name is required!");
       return;
@@ -390,9 +368,33 @@ const Home = () => {
       const result = await saveBill();
       alert("Bill saved successfully!");
       console.log("Saved bill:", result);
-      //print the bill
       printBill(billData, items, totals);
-      // Reload page for new invoice number
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    } catch (error) {
+      alert("Failed to save bill: " + error.message);
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    if (!billData.customer || billData.customer.trim() === "") {
+      alert("Customer name is required!");
+      return;
+    }
+
+    const hasValidItems = items.some((item) => item.productId && item.rate > 0);
+    if (!hasValidItems) {
+      alert("Please add at least one product to the bill!");
+      return;
+    }
+
+    try {
+      const result = await saveBill();
+      alert("Bill saved successfully!");
+      console.log("Saved bill:", result);
+      downloadExcel(billData, items, totals, products);
+      printBill(billData, items, totals);
       setTimeout(() => {
         window.location.reload();
       }, 2000);
@@ -438,7 +440,7 @@ const Home = () => {
           icon={AiFillBook}
           label="Invoice Number"
           required={false}
-          value={loading ? "Loading..." : billData.invoiceNumber} // ⭐ Show loading
+          value={loading ? "Loading..." : billData.invoiceNumber}
           disabled={true}
         />
         <InputComponent
@@ -458,6 +460,7 @@ const Home = () => {
           onChange={(e) => updateBillData("customer", e.target.value)}
         />
       </div>
+
       <div className="flex gap-0 justify-end">
         <div className="px-4">
           <button
@@ -501,13 +504,10 @@ const Home = () => {
       </div>
 
       <div className="flex justify-end ">
-        {" "}
         <div className="flex justify-end mt-4 mr-5">
           <button
-            onClick={async () => {
-              await handleSave();
-              downloadExcel(billData, items, totals, products);
-            }}
+            onClick={handleDownloadExcel}
+            disabled={loading}
             className="bg-cyan-800 text-white px-8 py-3 mb-3 rounded-lg text-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
           >
             {loading || !products || products.length === 0
@@ -518,7 +518,7 @@ const Home = () => {
         <div className="flex justify-end mt-4 mr-5">
           <button
             onClick={handleSave}
-            disabled={loading} //
+            disabled={loading}
             className="bg-cyan-800 text-white px-8 py-3 mb-3 rounded-lg text-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
           >
             {loading ? "Loading..." : "Save Bill"}
