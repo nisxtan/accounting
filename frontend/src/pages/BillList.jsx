@@ -3,6 +3,10 @@ import billService from "../api/billServices";
 import Pagination from "@mui/material/Pagination";
 import Stack from "@mui/material/Stack";
 
+import { AiFillFileExcel } from "react-icons/ai"; // Excel icon
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+
 const BillList = () => {
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +26,7 @@ const BillList = () => {
     hasNext: false,
     hasPrev: false,
   });
+
   const [debouncedFilters, setDebouncedFilters] = useState(filters);
   const [activeField, setActiveField] = useState(null);
   const cursorPositionRef = useRef(null);
@@ -46,7 +51,6 @@ const BillList = () => {
     if (!loading && activeField && inputRefs[activeField]?.current) {
       const input = inputRefs[activeField].current;
       input.focus();
-
       if (cursorPositionRef.current !== null && input.setSelectionRange) {
         input.setSelectionRange(
           cursorPositionRef.current,
@@ -68,33 +72,12 @@ const BillList = () => {
         limit: pagination.limit,
       });
 
-      console.log("Full Response from API:", response); // Debug log
-      console.log("Response keys:", Object.keys(response)); // Show all keys
-      console.log("response.result type:", typeof response.result);
-      console.log("response.result is array?", Array.isArray(response.result));
-      console.log("response.result content:", response.result);
-
-      // Handle different response structures
       let billsData = [];
-      if (Array.isArray(response)) {
-        billsData = response;
-      } else if (response.result && Array.isArray(response.result)) {
-        billsData = response.result;
-      } else if (response.results && Array.isArray(response.results)) {
-        billsData = response.results;
-      } else if (response.data && Array.isArray(response.data)) {
-        billsData = response.data;
-      } else if (response.bills && Array.isArray(response.bills)) {
-        billsData = response.bills;
-      } else {
-        console.error(
-          "⚠️ Bills array not found in response! Response structure:",
-          response
-        );
-      }
-
-      console.log("Extracted bills data:", billsData);
-      console.log("Bills count:", billsData.length);
+      if (Array.isArray(response)) billsData = response;
+      else if (response.result) billsData = response.result;
+      else if (response.results) billsData = response.results;
+      else if (response.data) billsData = response.data;
+      else if (response.bills) billsData = response.bills;
 
       setBills(billsData);
       setPagination(
@@ -108,9 +91,9 @@ const BillList = () => {
         }
       );
     } catch (error) {
-      setError("Failed to load bills");
       console.error("Failed to fetch bills", error);
-      setBills([]); // Ensure bills is always an array
+      setError("Failed to load bills");
+      setBills([]);
     } finally {
       setLoading(false);
     }
@@ -137,12 +120,148 @@ const BillList = () => {
     setPagination((prev) => ({ ...prev, page: newPage }));
   };
 
+  const downloadExcel = async (bill) => {
+    try {
+      let detailedBill = bill;
+
+      // Fetch full bill if items missing
+      if (!bill.items || bill.items.length === 0) {
+        detailedBill = await billService.getBillDetails(bill.invoiceNumber);
+      }
+
+      const items = detailedBill.items || [];
+
+      // Prepare rows for table
+      const excelData = [
+        [
+          "S.N.",
+          "Product",
+          "Quantity",
+          "Unit",
+          "Rate",
+          "Discount %",
+          "Taxable",
+          "Total",
+        ],
+      ];
+
+      items.forEach((item, index) => {
+        excelData.push([
+          index + 1,
+          item.product?.name || "N/A",
+          item.quantity,
+          item.unit,
+          item.rate.toFixed(2),
+          item.discountPercent,
+          item.isTaxable ? "Yes" : "No",
+          item.unit === "dozen"
+            ? (item.individualRate * 12).toFixed(2)
+            : item.unit === "box"
+            ? (item.individualRate * 6).toFixed(2)
+            : (item.individualRate * item.quantity).toFixed(2),
+        ]);
+      });
+
+      // Empty row + summary section
+      excelData.push([]);
+      excelData.push(["Bill Discount (%)", detailedBill.discountPercent]);
+      excelData.push(["VAT (%)", detailedBill.vatPercent]);
+      excelData.push(["Grand Total", detailedBill.grandTotal.toFixed(2)]);
+
+      // Convert array to sheet
+      const worksheet = XLSX.utils.aoa_to_sheet(excelData);
+
+      // Column widths (auto upscale)
+      const colWidths = [
+        { wch: 6 }, // S.N.
+        { wch: 25 }, // Product
+        { wch: 10 },
+        { wch: 10 },
+        { wch: 10 },
+        { wch: 12 },
+        { wch: 10 },
+        { wch: 12 },
+      ];
+      worksheet["!cols"] = colWidths;
+
+      // Apply styling to header row
+      const headerCells = ["A1", "B1", "C1", "D1", "E1", "F1", "G1", "H1"];
+      headerCells.forEach((cell) => {
+        if (worksheet[cell]) {
+          worksheet[cell].s = {
+            font: { bold: true, sz: 12 },
+            fill: { fgColor: { rgb: "D9E1F2" } },
+            border: {
+              top: { style: "thin", color: { rgb: "000000" } },
+              bottom: { style: "thin", color: { rgb: "000000" } },
+              left: { style: "thin", color: { rgb: "000000" } },
+              right: { style: "thin", color: { rgb: "000000" } },
+            },
+          };
+        }
+      });
+
+      // Apply border to all data rows
+      excelData.forEach((row, rIndex) => {
+        row.forEach((_, cIndex) => {
+          const cellAddress = XLSX.utils.encode_cell({ r: rIndex, c: cIndex });
+          if (worksheet[cellAddress]) {
+            worksheet[cellAddress].s = {
+              border: {
+                top: { style: "thin", color: { rgb: "999999" } },
+                bottom: { style: "thin", color: { rgb: "999999" } },
+                left: { style: "thin", color: { rgb: "999999" } },
+                right: { style: "thin", color: { rgb: "999999" } },
+              },
+            };
+          }
+        });
+      });
+
+      // Style summary section
+      const summaryStart = items.length + 2;
+      const summaryCells = [
+        `A${summaryStart + 1}`,
+        `A${summaryStart + 2}`,
+        `A${summaryStart + 3}`,
+      ];
+
+      summaryCells.forEach((cell) => {
+        if (worksheet[cell]) {
+          worksheet[cell].s = {
+            font: { bold: true, sz: 12 },
+          };
+        }
+      });
+
+      // ---------------------------------------------
+
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Invoice");
+
+      // Generate Excel file
+      const excelBuffer = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+        cellStyles: true,
+      });
+
+      // Download file
+      const blob = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      saveAs(blob, `Invoice_${bill.invoiceNumber}.xlsx`);
+    } catch (err) {
+      console.error("Excel error:", err);
+      alert("Failed to download Excel");
+    }
+  };
+
   const handlePrintBill = async (bill) => {
     try {
       setPrintingBill(bill.invoiceNumber);
-
-      // If bill already has items (from current API), use them
-      // Otherwise fetch from new API
       if (bill.items && bill.items.length > 0) {
         printBillDetails(bill);
       } else {
@@ -160,11 +279,7 @@ const BillList = () => {
 
   const printBillDetails = (bill) => {
     const printWindow = window.open("", "_blank");
-
-    if (!printWindow) {
-      alert("Please allow pop-ups to print the bill");
-      return;
-    }
+    if (!printWindow) return alert("Enable pop-ups to print.");
 
     const items = bill.items || [];
 
@@ -172,140 +287,58 @@ const BillList = () => {
       .map(
         (item, index) => `
       <tr>
-        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${
-          index + 1
-        }</td>
-        <td style="border: 1px solid #000; padding: 8px;">${
-          item.product?.name || "N/A"
-        }</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${
-          item.quantity
-        }</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${
-          item.unit
-        }</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: right;">Rs. ${item.rate.toFixed(
-          2
-        )}</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${
-          item.discountPercent
-        }%</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${
-          item.isTaxable ? "Yes" : "No"
-        }</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: right;">Rs. ${
+        <td>${index + 1}</td>
+        <td>${item.product?.name || "N/A"}</td>
+        <td>${item.quantity}</td>
+        <td>${item.unit}</td>
+        <td>Rs. ${item.rate.toFixed(2)}</td>
+        <td>${item.discountPercent}%</td>
+        <td>${item.isTaxable ? "Yes" : "No"}</td>
+        <td>Rs. ${
           item.unit === "dozen"
             ? (item.individualRate * 12).toFixed(2)
             : item.unit === "box"
             ? (item.individualRate * 6).toFixed(2)
             : (item.individualRate * item.quantity).toFixed(2)
         }</td>
-      </tr>
-    `
+      </tr>`
       )
       .join("");
 
     const htmlContent = `
-      <!DOCTYPE html>
       <html>
-      <head>
-        <title>Invoice ${bill.invoiceNumber}</title>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 30px;
-          }
-          .invoice-info {
-            margin-bottom: 20px;
-          }
-          .invoice-info div {
-            margin: 5px 0;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-          }
-          th {
-            background-color: #333;
-            color: white;
-            padding: 10px;
-            border: 1px solid #000;
-            text-align: left;
-          }
-          .totals {
-            margin-top: 20px;
-            text-align: right;
-          }
-          .totals div {
-            margin: 5px 0;
-            font-size: 14px;
-          }
-          .grand-total {
-            font-size: 18px;
-            font-weight: bold;
-            color: #006400;
-            margin-top: 10px;
-          }
-          @media print {
-            body { margin: 0; padding: 10px; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>SALES INVOICE</h1>
-        </div>
-        
-        <div class="invoice-info">
-          <div><strong>Invoice Number:</strong> ${bill.invoiceNumber}</div>
-          <div><strong>Customer:</strong> ${bill.customer}</div>
-          <div><strong>Date:</strong> ${new Date(
-            bill.salesDate
-          ).toLocaleDateString()}</div>
-        </div>
+        <body>
+          <h1>Sales Invoice</h1>
+          <h3>Invoice #: ${bill.invoiceNumber}</h3>
+          <h3>Customer: ${bill.customer}</h3>
+          <h3>Date: ${new Date(bill.salesDate).toLocaleDateString()}</h3>
 
-        <table>
-          <thead>
-            <tr>
-              <th style="text-align: center;">S.N.</th>
-              <th>Product</th>
-              <th style="text-align: center;">Qty</th>
-              <th style="text-align: center;">Unit</th>
-              <th style="text-align: right;">Rate</th>
-              <th style="text-align: center;">Disc%</th>
-              <th style="text-align: center;">Taxable</th>
-              <th style="text-align: right;">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${
-              itemsHTML ||
-              '<tr><td colspan="8" style="text-align: center; padding: 20px;">No items</td></tr>'
-            }
-          </tbody>
-        </table>
+          <table border="1" cellspacing="0" cellpadding="6" width="100%">
+            <thead>
+              <tr>
+                <th>S.N.</th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Unit</th>
+                <th>Rate</th>
+                <th>Disc%</th>
+                <th>Taxable</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHTML}
+            </tbody>
+          </table>
 
-        <div class="totals">
-          <div><strong>Bill Discount:</strong> ${bill.discountPercent}%</div>
-          <div><strong>VAT:</strong> ${bill.vatPercent}%</div>
-          <div class="grand-total">Grand Total: Rs. ${bill.grandTotal?.toFixed(
-            2
-          )}</div>
-        </div>
+          <h3>Discount: ${bill.discountPercent}%</h3>
+          <h3>VAT: ${bill.vatPercent}%</h3>
+          <h2>Grand Total: Rs. ${bill.grandTotal?.toFixed(2)}</h2>
 
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 250);
-          };
-        </script>
-      </body>
+          <script>
+            window.onload = () => setTimeout(() => window.print(), 250);
+          </script>
+        </body>
       </html>
     `;
 
@@ -317,8 +350,8 @@ const BillList = () => {
 
   return (
     <>
-      {/* Filters Section */}
-      <div className="p-4 bg-white border-b grid grid-cols-1 md:grid-cols-5 gap-4">
+      {/* Filters */}
+      <div className="p-4 bg-white grid grid-cols-1 md:grid-cols-5 gap-4 ml-39 mt-5">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Customer Name
@@ -336,7 +369,7 @@ const BillList = () => {
             placeholder="Search customer..."
             value={filters.customerName}
             onChange={(e) => handleFilterChange("customerName", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
           />
         </div>
 
@@ -358,7 +391,7 @@ const BillList = () => {
             placeholder="0"
             value={filters.minTotal}
             onChange={(e) => handleFilterChange("minTotal", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
           />
         </div>
 
@@ -380,14 +413,14 @@ const BillList = () => {
             placeholder="10000"
             value={filters.maxTotal}
             onChange={(e) => handleFilterChange("maxTotal", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
           />
         </div>
 
         <div className="flex items-end">
           <button
             onClick={clearFilters}
-            className="w-full bg-gray-500 text-white px-3 py-2 rounded-md hover:bg-gray-600"
+            className="w-full bg-gray-500 text-white px-3 py-2 rounded-md"
           >
             Clear Filters
           </button>
@@ -399,8 +432,8 @@ const BillList = () => {
       )}
 
       {/* Table */}
-      <div className="w-full overflow-x-auto p-4">
-        <table className="w-full border-collapse border border-gray-300">
+      <div className="border-t w-full overflow-x-auto p-4 mt-8">
+        <table className="w-full border-collapse border border-gray-300 mt-10">
           <thead>
             <tr className="bg-gray-700 text-white text-left text-xs font-semibold">
               <th className="p-2 border border-gray-400">Invoice #</th>
@@ -409,9 +442,12 @@ const BillList = () => {
               <th className="p-2 border border-gray-400">Disc%</th>
               <th className="p-2 border border-gray-400">VAT%</th>
               <th className="p-2 border border-gray-400">Grand Total</th>
-              <th className="p-2 border border-gray-400 text-center">Action</th>
+              <th className="p-2 border border-gray-400 text-center">
+                Actions
+              </th>
             </tr>
           </thead>
+
           <tbody>
             {bills.length === 0 ? (
               <tr>
@@ -424,8 +460,6 @@ const BillList = () => {
               </tr>
             ) : (
               bills.map((bill) => {
-                const items = bill.items || [];
-
                 return (
                   <tr
                     key={bill.invoiceNumber}
@@ -449,15 +483,27 @@ const BillList = () => {
                     <td className="p-2 border border-gray-300 font-bold text-green-700">
                       Rs. {bill.grandTotal?.toFixed(2)}
                     </td>
-                    <td className="p-2 border border-gray-300 text-center">
+
+                    {/* ACTION BUTTONS */}
+                    <td className="p-2 border border-gray-300 text-center flex gap-3 justify-center">
+                      {/* Print Button */}
                       <button
                         onClick={() => handlePrintBill(bill)}
                         disabled={printingBill === bill.invoiceNumber}
-                        className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700"
                       >
                         {printingBill === bill.invoiceNumber
                           ? "Loading..."
                           : "Print"}
+                      </button>
+
+                      {/* Excel Button */}
+                      <button
+                        onClick={() => downloadExcel(bill)}
+                        className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700"
+                        title="Download Excel"
+                      >
+                        <AiFillFileExcel size={20} />
                       </button>
                     </td>
                   </tr>
@@ -482,12 +528,6 @@ const BillList = () => {
             </Stack>
           </div>
         )}
-
-        <div className="mt-4 text-sm text-gray-600">
-          Showing {bills.length} bills with{" "}
-          {bills.reduce((sum, b) => sum + (b.items?.length || 0), 0)} total
-          items
-        </div>
       </div>
     </>
   );

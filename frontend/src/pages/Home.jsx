@@ -181,12 +181,12 @@ const Home = () => {
   };
 
   const downloadExcel = (billData, items, totals, products) => {
-    console.log("🔍 DEBUG - downloadExcel called with:", {
-      billData: billData?.invoiceNumber,
-      itemsCount: items?.length,
-      productsCount: products?.length,
-      products: products,
-    });
+    // console.log("🔍 DEBUG - downloadExcel called with:", {
+    //   billData: billData?.invoiceNumber,
+    //   itemsCount: items?.length,
+    //   productsCount: products?.length,
+    //   products: products,
+    // });
 
     const wb = XLSX.utils.book_new();
     const invoiceData = [];
