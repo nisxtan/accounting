@@ -1,9 +1,10 @@
+// src/controllers/auth.controller.js
 const authService = require("../services/auth.service");
 
 class AuthController {
   async register(req, res) {
     try {
-      const { username, email, password } = req.body;
+      const { username, email, password, role } = req.body; // ADD ROLE
 
       // Validation
       if (!username || !email || !password) {
@@ -24,6 +25,7 @@ class AuthController {
           id: user.id,
           username: user.username,
           email: user.email,
+          role: user.role, // ADD ROLE TO RESPONSE
           createdAt: user.createdAt,
         },
       });

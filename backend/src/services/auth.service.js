@@ -18,10 +18,11 @@ class AuthService {
     // hash password
     const hashedPassword = await bcrypt.hash(userData.password, 10);
 
-    // create user
+    // create user with default role 'user'
     const user = userRepository.create({
       ...userData,
       password: hashedPassword,
+      role: userData.role || "user", // Add role, default to 'user'
     });
 
     return await userRepository.save(user);
@@ -47,7 +48,7 @@ class AuthService {
       throw new Error("Invalid credentials");
     }
 
-    // generate JWT token
+    // generate JWT token WITH role
     const token = jwt.sign(
       {
         userId: user.id,
