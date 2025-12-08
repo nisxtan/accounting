@@ -1,19 +1,20 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { persistStore, persistReducer } from "redux-persist";
 import storage from "redux-persist/lib/storage";
-import authReducer from "./slices/authSlice";
 
+import authReducer, { setHydrated } from "./slices/authSlice";
+
+// Persist config only for auth slice
 const persistConfig = {
-  key: "root",
+  key: "auth",
   storage,
-  whitelist: ["auth"],
 };
 
-const persistedReducer = persistReducer(persistConfig, authReducer);
+const persistedAuthReducer = persistReducer(persistConfig, authReducer);
 
 export const store = configureStore({
   reducer: {
-    auth: persistedReducer,
+    auth: persistedAuthReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -23,4 +24,12 @@ export const store = configureStore({
     }),
 });
 
+// Create persistor
 export const persistor = persistStore(store);
+
+persistor.subscribe(() => {
+  const { bootstrapped } = persistor.getState();
+  if (bootstrapped) {
+    store.dispatch(setHydrated());
+  }
+});

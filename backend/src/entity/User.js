@@ -1,4 +1,3 @@
-// src/entity/User.js
 const { EntitySchema } = require("typeorm");
 
 module.exports = new EntitySchema({
@@ -24,7 +23,6 @@ module.exports = new EntitySchema({
       type: "varchar",
       nullable: false,
     },
-
     createdAt: {
       type: "timestamp",
       createDate: true,
@@ -35,11 +33,16 @@ module.exports = new EntitySchema({
     },
   },
   relations: {
-    slaesBill: {
+    salesBill: {
       type: "one-to-many",
       target: "SalesBill",
       inverseSide: "user",
       nullable: true,
+    },
+    createdCustomers: {
+      type: "one-to-many",
+      target: "Customer",
+      inverseSide: "createdBy",
     },
   },
 });

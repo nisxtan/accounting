@@ -16,6 +16,10 @@ import { selectIsAuthenticated } from "./redux/slices/authSlice";
 
 const App = () => {
   const isAuthenticated = useSelector(selectIsAuthenticated);
+  console.log(
+    "TOKEN:",
+    useSelector((state) => state.auth.token)
+  );
 
   return (
     <Router>
@@ -51,8 +55,8 @@ const App = () => {
           }
         />
 
-        <Route path="/" element={<Navigate to="/sales" replace />} />
-        <Route path="*" element={<Navigate to="/sales" replace />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>
   );

@@ -8,7 +8,7 @@ const initialState = {
     email: null,
     role: null,
   },
-  isAuthenticated: false,
+  hydrated: false, 
 };
 
 const authSlice = createSlice({
@@ -16,8 +16,6 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     setCredentials: (state, action) => {
-      console.log("🔍 setCredentials payload:", action.payload);
-
       const { token, user } = action.payload;
 
       state.token = token;
@@ -27,7 +25,6 @@ const authSlice = createSlice({
         email: user.email,
         role: user.role || null,
       };
-      state.isAuthenticated = true;
     },
 
     logout: (state) => {
@@ -38,22 +35,30 @@ const authSlice = createSlice({
         email: null,
         role: null,
       };
-      state.isAuthenticated = false;
-    },
 
+      localStorage.removeItem("persist:auth");
+    },
     updateUser: (state, action) => {
       state.user = {
         ...state.user,
         ...action.payload,
       };
     },
+
+    setHydrated: (state) => {
+      state.hydrated = true;
+    },
   },
 });
 
-export const { setCredentials, logout, updateUser } = authSlice.actions;
+export const { setCredentials, logout, updateUser, setHydrated } =
+  authSlice.actions;
+
 export default authSlice.reducer;
 
+// selectors
 export const selectToken = (state) => state.auth.token;
 export const selectUser = (state) => state.auth.user;
-export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
+export const selectIsAuthenticated = (state) => Boolean(state.auth.token);
 export const selectUserRole = (state) => state.auth.user.role;
+export const selectHydrated = (state) => state.auth.hydrated;

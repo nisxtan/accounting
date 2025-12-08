@@ -170,11 +170,14 @@ export const useBill = () => {
       const billPayload = {
         invoiceNumber: billData.invoiceNumber,
         salesDate: billData.salesDate,
-        customer: billData.customer,
+        // customer: billData.customer,
+        customerId: billData.customerId,
         discountPercent: billData.discountPercent,
         vatPercent: billData.vatPercent,
         items: items.filter((item) => item.productId && item.rate > 0),
       };
+
+      console.log("Saving bill with payload:", billPayload);
 
       const savedBill = await billService.create(billPayload);
 

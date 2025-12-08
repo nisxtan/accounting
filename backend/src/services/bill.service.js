@@ -94,8 +94,21 @@ class BillService {
         );
       }
 
+      if (!billData.customerId) {
+        throw new Error("Customer ID is required");
+      }
+
+      const customerRepository = queryRunner.manager.getRepository("Customer");
+      const customer = await customerRepository.findOne({
+        where: { id: billData.customerId },
+      });
+
+      if (!customer) {
+        throw new Error(`Customer with ID ${billData.customerId} not found`);
+      }
+
       // validate all products exist BEFORE starting transaction
-      const productRepository = queryRunner.manager.getRepository(Product);
+      const productRepository = queryRunner.manager.getRepository("Product");
 
       for (const itemData of billData.items) {
         const product = await productRepository.findOne({
@@ -129,11 +142,11 @@ class BillService {
       );
 
       //save salesBill
-      const billRepository = queryRunner.manager.getRepository(SalesBill);
+      const billRepository = queryRunner.manager.getRepository("SalesBill");
       const bill = billRepository.create({
         invoiceNumber,
         salesDate: billData.salesDate,
-        customer: billData.customer,
+        customer: customer, // ✅ FIX: Link customer object, not string
         subTotal: totals.subTotal,
         discountPercent: billData.discountPercent || 0,
         discountAmount: totals.discountAmount,
@@ -148,7 +161,7 @@ class BillService {
       await this.markInvoiceNumberAsUsed(invoiceNumber);
 
       // Create sales items and update product quantities
-      const itemRepository = queryRunner.manager.getRepository(SaleItem);
+      const itemRepository = queryRunner.manager.getRepository("SalesItem");
 
       for (let i = 0; i < billData.items.length; i++) {
         const itemData = billData.items[i];
@@ -158,7 +171,6 @@ class BillService {
           itemData.unit
         );
 
-        //Explicitly set productId and billId
         const salesItem = itemRepository.create({
           productId: itemData.productId,
           billId: savedBill.id,
@@ -192,7 +204,7 @@ class BillService {
       // Return complete bill with relations
       const completeBill = await billRepository.findOne({
         where: { id: savedBill.id },
-        relations: ["items", "items.product"],
+        relations: ["items", "items.product", "customer"], // ✅ Include customer
       });
 
       return completeBill;
@@ -308,11 +320,11 @@ class BillService {
       const billRepository = AppDataSource.getRepository("SalesBill");
       const queryBuilder = billRepository
         .createQueryBuilder("bill")
+        .leftJoinAndSelect("bill.customer", "customer")
         .orderBy("bill.invoiceNumber", "ASC");
 
-      // Customer name filter
       if (filters.customerName) {
-        queryBuilder.andWhere("bill.customer ILIKE :customerName", {
+        queryBuilder.andWhere("customer.fullName ILIKE :customerName", {
           customerName: `%${filters.customerName}%`,
         });
       }
@@ -339,24 +351,22 @@ class BillService {
         });
       }
 
-      //?Pagination
       const page = parseInt(filters.page) || 1;
       const limit = parseInt(filters.limit) || 10;
       const skip = (page - 1) * limit;
 
-      //apply pagination to query
       queryBuilder.skip(skip).take(limit);
 
       const bills = await queryBuilder.getMany();
 
-      //count query - get total number of records
+      // Count query
       const countQueryBuilder = billRepository
         .createQueryBuilder("bill")
+        .leftJoin("bill.customer", "customer") // JOIN for count
         .select("COUNT(bill.id)", "count");
 
-      // Apply the same filters to count query
       if (filters.customerName) {
-        countQueryBuilder.andWhere("bill.customer ILIKE :customerName", {
+        countQueryBuilder.andWhere("customer.fullName ILIKE :customerName", {
           customerName: `%${filters.customerName}%`,
         });
       }
@@ -380,11 +390,11 @@ class BillService {
           maxTotal: Number(filters.maxTotal),
         });
       }
+
       const countResult = await countQueryBuilder.getRawOne();
       const totalCount = parseInt(countResult.count);
-
-      //calculate total pages
       const totalPages = Math.ceil(totalCount / limit);
+
       return {
         result: bills,
         pagination: {

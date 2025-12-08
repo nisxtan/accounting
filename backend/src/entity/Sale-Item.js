@@ -13,7 +13,7 @@ module.exports = new EntitySchema({
     },
     billId: {
       type: "int",
-      nullable: false, // Required - item must belong to a bill
+      nullable: false, // item must belong to a bill
     },
 
     quantity: { type: "int" },

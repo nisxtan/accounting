@@ -6,8 +6,10 @@ import Stack from "@mui/material/Stack";
 import { AiFillFileExcel } from "react-icons/ai"; // Excel icon
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import { Link, useNavigate } from "react-router-dom";
 
 const BillList = () => {
+  const navigate = useNavigate();
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -352,6 +354,16 @@ const BillList = () => {
     <>
       {/* Filters */}
       <div className="p-4 bg-white grid grid-cols-1 md:grid-cols-5 gap-4 ml-39 mt-5">
+        <div>
+          <button
+            onClick={() => navigate("/sales")}
+            className="px-4 py-2 bg-green-300 text-black font-medium rounded-lg 
+             shadow-sm hover:bg-green-400 hover:shadow-md mt-5 ml--10
+             transition-all duration-200"
+          >
+            Back to Home
+          </button>
+        </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Customer Name

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { store } from "../redux/store";
 
 const axiosInstance = axios.create({
   baseURL: "http://localhost:8008/api/v1",
@@ -8,14 +9,30 @@ const axiosInstance = axios.create({
   timeout: 10000,
 });
 
+// Add token to every request from Redux store
 axiosInstance.interceptors.request.use(
   (config) => {
+    // Get token from Redux store
+    const state = store.getState();
+    const token = state.auth.token;
+
+    // Add token to headers if it exists
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    console.log("Request config:", {
+      url: config.url,
+      hasToken: !!token,
+    }); // Debug log
+
     return config;
   },
   (error) => {
-    Promise.reject(error);
+    return Promise.reject(error);
   }
 );
+
 axiosInstance.interceptors.response.use(
   (response) => {
     console.log("Response received:", response.data);
@@ -23,6 +40,10 @@ axiosInstance.interceptors.response.use(
   },
   (error) => {
     console.error("API Error:", error.response?.data || error.message);
+    if (error.response?.status === 401) {
+      console.log("Unauthorized - token may be invalid or expired");
+    }
+
     return Promise.reject(error);
   }
 );

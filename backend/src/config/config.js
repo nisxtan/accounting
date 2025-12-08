@@ -9,5 +9,7 @@ const DBConfig = {
   DB_NAME: process.env.DB_NAME || "accounting",
 };
 // console.log(DBConfig);
-
-module.exports = { DBConfig };
+const JwtConfig = {
+  JWT_SECRET: process.env.JWT_SECRET,
+};
+module.exports = { DBConfig, JwtConfig };

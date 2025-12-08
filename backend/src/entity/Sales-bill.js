@@ -17,9 +17,6 @@ module.exports = new EntitySchema({
     salesDate: {
       type: "date",
     },
-    customer: {
-      type: "varchar",
-    },
     subTotal: {
       type: "float",
       default: 0,
@@ -66,7 +63,26 @@ module.exports = new EntitySchema({
       type: "one-to-many",
       target: "SalesItem",
       inverseSide: "bill",
-      // cascade: true,
+    },
+    customer: {
+      type: "many-to-one",
+      target: "Customer",
+      inverseSide: "bills",
+      joinColumn: {
+        name: "customerId",
+        referencedColumnName: "id",
+      },
+      nullable: false,
+    },
+    user: {
+      type: "many-to-one",
+      target: "User",
+      inverseSide: "salesBills",
+      joinColumn: {
+        name: "userId",
+        referencedColumnName: "id",
+      },
+      nullable: true,
     },
   },
 });

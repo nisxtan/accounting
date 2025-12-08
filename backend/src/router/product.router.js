@@ -11,7 +11,7 @@ productRouter.get("/:id", ProductController.getProductById);
 // CHECK STOCK
 productRouter.post("/check-stock", ProductController.checkStock);
 
-// CREATE PRODUCT (pachi use garne)
+// CREATE PRODUCT
 productRouter.post("/", ProductController.createProduct);
 
 module.exports = productRouter;

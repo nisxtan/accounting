@@ -1,12 +1,12 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { AppDataSource } = require("../config/database");
+const { JwtConfig } = require("../config/config");
 
 class AuthService {
   async register(userData) {
     const userRepository = AppDataSource.getRepository("User");
 
-    // check if email OR username already exist
     const existingUser = await userRepository.findOne({
       where: [{ email: userData.email }, { username: userData.username }],
     });
@@ -15,14 +15,11 @@ class AuthService {
       throw new Error("User with this email or username already exists");
     }
 
-    // hash password
     const hashedPassword = await bcrypt.hash(userData.password, 10);
 
-    // create user with default role 'user'
     const user = userRepository.create({
       ...userData,
       password: hashedPassword,
-      role: userData.role || "user", // Add role, default to 'user'
     });
 
     return await userRepository.save(user);
@@ -31,7 +28,6 @@ class AuthService {
   async login(identifier, password) {
     const userRepository = AppDataSource.getRepository("User");
 
-    // separate if identifier is email or username
     const isEmail = identifier.includes("@");
 
     const user = await userRepository.findOne({
@@ -42,20 +38,18 @@ class AuthService {
       throw new Error("Invalid credentials");
     }
 
-    // compare passwords
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
       throw new Error("Invalid credentials");
     }
 
-    // generate JWT token WITH role
     const token = jwt.sign(
       {
         userId: user.id,
         email: user.email,
         username: user.username,
       },
-      process.env.JWT_SECRET || "nisclfasdlkd3553235f4d65fd",
+      JwtConfig.JWT_SECRET,
       { expiresIn: "24h" }
     );
 

@@ -1,12 +1,10 @@
-// src/controllers/auth.controller.js
 const authService = require("../services/auth.service");
 
 class AuthController {
   async register(req, res) {
     try {
-      const { username, email, password, role } = req.body; // ADD ROLE
+      const { username, email, password } = req.body;
 
-      // Validation
       if (!username || !email || !password) {
         return res.status(400).json({
           error: "Username, email and password are required",
@@ -25,7 +23,6 @@ class AuthController {
           id: user.id,
           username: user.username,
           email: user.email,
-          role: user.role, // ADD ROLE TO RESPONSE
           createdAt: user.createdAt,
         },
       });
@@ -57,7 +54,8 @@ class AuthController {
 
   async getCurrentUser(req, res) {
     try {
-      const user = await authService.getUserById(req.user.userId);
+      const userId = req.user.userId || req.user.id;
+      const user = await authService.getUserById(userId);
 
       if (!user) {
         return res.status(404).json({ error: "User not found" });

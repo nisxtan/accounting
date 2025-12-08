@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import {
@@ -11,17 +11,24 @@ import {
   AiOutlineShoppingCart,
   AiOutlineUser,
   AiOutlineUserAdd,
+  AiOutlineLogout,
+  AiOutlineSearch,
+  AiOutlinePlus,
 } from "react-icons/ai";
 import InputComponent from "../components/InputComponent";
 import InvoiceSummary from "../components/InvoiceSummary";
 import Table from "../components/Table";
 import { useBill } from "../hooks/useBill";
-import { useState } from "react";
+import { useDispatch } from "react-redux";
+import { logout } from "../redux/slices/authSlice";
 import AddProductModal from "../components/AddProductModal";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import Select from "react-select";
+import customerService from "../api/customerService";
 
 const Home = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const {
     items,
     products,
@@ -37,6 +44,17 @@ const Home = () => {
   } = useBill();
 
   const [productModal, setProductModal] = useState(false);
+  const [customerModal, setCustomerModal] = useState(false);
+  const [customerOptions, setCustomerOptions] = useState([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [newCustomer, setNewCustomer] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    address: "",
+  });
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
 
   const handleProductAdded = async (newProduct) => {
     await loadProducts();
@@ -45,6 +63,164 @@ const Home = () => {
 
   const handleAddProductClick = () => {
     setProductModal(true);
+  };
+
+  const handleAddCustomerClick = () => {
+    setCustomerModal(true);
+  };
+
+  // Logout function using Redux
+  const handleLogout = () => {
+    dispatch(logout());
+    navigate("/login");
+  };
+
+  // Load customers on component mount
+  useEffect(() => {
+    loadCustomers();
+  }, []);
+
+  // Load customers from API
+  const loadCustomers = async (search = "") => {
+    try {
+      setIsLoadingCustomers(true);
+      const response = await customerService.getAllCustomers({
+        search: search,
+        page: 1,
+        limit: 20,
+      });
+
+      // Transform API response to react-select options format
+      const options =
+        response.data?.customers?.map((customer) => ({
+          value: customer.id,
+          label: `${customer.fullName}${
+            customer.phone ? ` (${customer.phone})` : ""
+          }${customer.email ? ` - ${customer.email}` : ""}`,
+          customerData: customer,
+        })) || [];
+
+      setCustomerOptions(options);
+    } catch (error) {
+      console.error("Failed to load customers:", error);
+      setCustomerOptions([]);
+    } finally {
+      setIsLoadingCustomers(false);
+    }
+  };
+
+  // Handle customer search input change
+  const handleCustomerSearch = (inputValue) => {
+    setSearchInput(inputValue);
+    if (inputValue.trim().length > 1) {
+      loadCustomers(inputValue);
+    } else if (inputValue.trim().length === 0) {
+      loadCustomers("");
+    }
+  };
+
+  // Handle customer selection
+  const handleCustomerSelect = (selectedOption) => {
+    if (selectedOption) {
+      updateBillData("customer", selectedOption.customerData.fullName);
+      updateBillData("customerId", selectedOption.value);
+    } else {
+      updateBillData("customer", "");
+      updateBillData("customerId", null);
+    }
+  };
+
+  // Handle new customer form input change
+  const handleNewCustomerChange = (e) => {
+    const { name, value } = e.target;
+    setNewCustomer((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Handle save new customer
+  const handleSaveNewCustomer = async () => {
+    if (!newCustomer.fullName.trim()) {
+      alert("Customer name is required!");
+      return;
+    }
+
+    try {
+      setIsCreatingCustomer(true);
+      const response = await customerService.createCustomer({
+        ...newCustomer,
+        status: true,
+      });
+
+      //  Access the nested customer object
+      const customerData = response.customer || response;
+
+      // Create new option for select
+      const newOption = {
+        value: customerData.id,
+        label: `${customerData.fullName}${
+          customerData.phone ? ` (${customerData.phone})` : ""
+        }${customerData.email ? ` - ${customerData.email}` : ""}`,
+        customerData: customerData,
+      };
+
+      // Update customer options
+      setCustomerOptions((prev) => [newOption, ...prev]);
+
+      // Set the selected customer
+      updateBillData("customer", customerData.fullName);
+      updateBillData("customerId", customerData.id);
+
+      // Reset form and close modal
+      setNewCustomer({
+        fullName: "",
+        email: "",
+        phone: "",
+        address: "",
+      });
+      setCustomerModal(false);
+
+      alert("Customer added successfully!");
+    } catch (error) {
+      console.error("Failed to create customer:", error);
+      alert(error.error || "Failed to create customer. Please try again.");
+    } finally {
+      setIsCreatingCustomer(false);
+    }
+  };
+
+  // Quick create customer from input
+  const handleCreateNewCustomer = async (inputValue) => {
+    try {
+      const newCustomerData = {
+        fullName: inputValue.trim(),
+        phone: "",
+        email: "",
+        address: "",
+        status: true,
+      };
+
+      const response = await customerService.createCustomer(newCustomerData);
+
+      const newOption = {
+        value: response.id,
+        label: `${response.fullName}${
+          response.phone ? ` (${response.phone})` : ""
+        }${response.email ? ` - ${response.email}` : ""}`,
+        customerData: response,
+      };
+
+      setCustomerOptions((prev) => [newOption, ...prev]);
+      updateBillData("customer", response.fullName);
+      updateBillData("customerId", response.id);
+
+      return newOption;
+    } catch (error) {
+      console.error("Failed to create customer:", error);
+      alert("Failed to create new customer. Please try again.");
+      return null;
+    }
   };
 
   const printBill = (billData, items, totals) => {
@@ -181,13 +357,6 @@ const Home = () => {
   };
 
   const downloadExcel = (billData, items, totals, products) => {
-    // console.log("🔍 DEBUG - downloadExcel called with:", {
-    //   billData: billData?.invoiceNumber,
-    //   itemsCount: items?.length,
-    //   productsCount: products?.length,
-    //   products: products,
-    // });
-
     const wb = XLSX.utils.book_new();
     const invoiceData = [];
 
@@ -403,6 +572,17 @@ const Home = () => {
     }
   };
 
+  // Find current selected customer option
+  const currentCustomerOption =
+    customerOptions.find((option) => option.value === billData.customerId) ||
+    (billData.customer
+      ? {
+          value: null,
+          label: billData.customer,
+          customerData: { fullName: billData.customer },
+        }
+      : null);
+
   return (
     <div className="bg-slate-300 min-h-screen">
       <header className="flex justify-between items-start px-6 py-3 gap-3">
@@ -432,6 +612,14 @@ const Home = () => {
             <AiOutlineUserAdd />
           </div>
           <div>SuperAdmin </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 ml-4 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+            title="Logout"
+          >
+            <AiOutlineLogout />
+            <span className="text-sm">Logout</span>
+          </button>
         </div>
       </header>
 
@@ -452,13 +640,64 @@ const Home = () => {
           onChange={(e) => updateBillData("salesDate", e.target.value)}
           max={new Date().toISOString().split("T")[0]}
         />
-        <InputComponent
-          icon={AiOutlineUser}
-          label="Customer"
-          required={true}
-          value={billData.customer}
-          onChange={(e) => updateBillData("customer", e.target.value)}
-        />
+
+        {/* Customer Dropdown with Search and Add Button */}
+        <div className="w-full max-w-md">
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium text-gray-700">
+              Customer <span className="text-red-500">*</span>
+            </label>
+            <button
+              onClick={handleAddCustomerClick}
+              className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+            >
+              <AiOutlinePlus className="text-xs" />
+              <span>Add Customer</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 relative">
+              <Select
+                value={currentCustomerOption}
+                onChange={handleCustomerSelect}
+                onInputChange={handleCustomerSearch}
+                options={customerOptions}
+                isLoading={isLoadingCustomers}
+                isClearable
+                isSearchable
+                placeholder="Search or select customer..."
+                noOptionsMessage={() => "Type to search customers..."}
+                formatCreateLabel={(inputValue) =>
+                  `Create new: "${inputValue}"`
+                }
+                onCreateOption={handleCreateNewCustomer}
+                className="react-select-container"
+                classNamePrefix="react-select"
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    borderColor: "#d1d5db",
+                    borderRadius: "0.375rem",
+                    padding: "0.125rem",
+                    minHeight: "42px",
+                  }),
+                  menu: (base) => ({
+                    ...base,
+                    zIndex: 50,
+                  }),
+                }}
+              />
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                <AiOutlineUser />
+              </div>
+            </div>
+          </div>
+          {billData.customerId && (
+            <p className="text-xs text-gray-500 mt-1">
+              Customer ID: {billData.customerId}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-0 justify-end">
@@ -525,6 +764,101 @@ const Home = () => {
           </button>
         </div>
       </div>
+
+      {/* Customer Modal - Moved to bottom */}
+      {customerModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Add New Customer
+              </h2>
+              <button
+                onClick={() => setCustomerModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="fullName"
+                  value={newCustomer.fullName}
+                  onChange={handleNewCustomerChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter customer name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={newCustomer.phone}
+                  onChange={handleNewCustomerChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter phone number"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={newCustomer.email}
+                  onChange={handleNewCustomerChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter email address"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address
+                </label>
+                <textarea
+                  name="address"
+                  value={newCustomer.address}
+                  onChange={handleNewCustomerChange}
+                  rows="3"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter address"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setCustomerModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                disabled={isCreatingCustomer}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveNewCustomer}
+                disabled={isCreatingCustomer || !newCustomer.fullName.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {isCreatingCustomer ? "Saving..." : "Save Customer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <AddProductModal
         isOpen={productModal}
