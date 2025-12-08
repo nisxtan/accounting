@@ -107,21 +107,31 @@ class BillService {
         throw new Error(`Customer with ID ${billData.customerId} not found`);
       }
 
-      // validate all products exist BEFORE starting transaction
-      const productRepository = queryRunner.manager.getRepository("Product");
+      if (!billData.userId) {
+        throw new Error("User ID is required");
+      }
 
+      const userRepository = queryRunner.manager.getRepository("User");
+      const user = await userRepository.findOne({
+        where: { id: billData.userId },
+      });
+
+      if (!user) {
+        throw new Error(`User with ID ${billData.userId} not found`);
+      }
+
+      // Validate all products exist BEFORE starting transaction
+      const productRepository = queryRunner.manager.getRepository("Product");
       for (const itemData of billData.items) {
         const product = await productRepository.findOne({
           where: { id: itemData.productId },
         });
-
         if (!product) {
           throw new Error(
             `Product with ID ${itemData.productId} does not exist`
           );
         }
 
-        //Check stock availability
         const requiredQty = salesItemService.getBaseQuantity(
           itemData.quantity,
           itemData.unit
@@ -141,12 +151,13 @@ class BillService {
         billData.vatPercent
       );
 
-      //save salesBill
+      // Save salesBill
       const billRepository = queryRunner.manager.getRepository("SalesBill");
       const bill = billRepository.create({
         invoiceNumber,
         salesDate: billData.salesDate,
-        customer: customer, // ✅ FIX: Link customer object, not string
+        customer: customer, // link customer
+        user: user, // link user properly
         subTotal: totals.subTotal,
         discountPercent: billData.discountPercent || 0,
         discountAmount: totals.discountAmount,
@@ -156,13 +167,13 @@ class BillService {
         vatAmount: totals.vatAmount,
         grandTotal: totals.grandTotal,
       });
+
       const savedBill = await billRepository.save(bill);
 
       await this.markInvoiceNumberAsUsed(invoiceNumber);
 
       // Create sales items and update product quantities
       const itemRepository = queryRunner.manager.getRepository("SalesItem");
-
       for (let i = 0; i < billData.items.length; i++) {
         const itemData = billData.items[i];
         const calculatedItem = totals.calculatedItems[i];
@@ -204,7 +215,7 @@ class BillService {
       // Return complete bill with relations
       const completeBill = await billRepository.findOne({
         where: { id: savedBill.id },
-        relations: ["items", "items.product", "customer"], // ✅ Include customer
+        relations: ["items", "items.product", "customer", "user"], // include user
       });
 
       return completeBill;

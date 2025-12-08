@@ -15,6 +15,7 @@ axiosInstance.interceptors.request.use(
     // Get token from Redux store
     const state = store.getState();
     const token = state.auth.token;
+    console.log("TOKEN SENT TO BACKEND:", token);
 
     // Add token to headers if it exists
     if (token) {

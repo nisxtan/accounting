@@ -15,6 +15,7 @@ const authMiddleware = (req, res, next) => {
       token,
       JwtConfig.JWT_SECRET || "fallback-secret"
     );
+    console.log("BACKEND RECEIVED TOKEN:", req.headers.authorization);
 
     console.log("Decoded token:", decoded); // Debug log
     req.user = decoded;

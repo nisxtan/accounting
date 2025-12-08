@@ -25,10 +25,13 @@ import AddProductModal from "../components/AddProductModal";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 import customerService from "../api/customerService";
+import { useSelector } from "react-redux";
 
 const Home = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
+  console.log("user", user);
   const {
     items,
     products,
@@ -611,15 +614,33 @@ const Home = () => {
           <div>
             <AiOutlineUserAdd />
           </div>
-          <div>SuperAdmin </div>
-          <button
+          <div className="flex text-xl items-center gap-3">
+            {/* <AiOutlineUserAdd className="text-2xl" /> */}
+
+            {user && (
+              <div className="font-medium">
+                Welcome, <span className="text-blue-600">{user.name}</span>
+              </div>
+            )}
+
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+              title="Logout"
+            >
+              <AiOutlineLogout />
+              <span className="text-sm">Logout</span>
+            </button>
+          </div>
+
+          {/* <button
             onClick={handleLogout}
             className="flex items-center gap-2 ml-4 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
             title="Logout"
           >
             <AiOutlineLogout />
             <span className="text-sm">Logout</span>
-          </button>
+          </button> */}
         </div>
       </header>
 
@@ -688,7 +709,7 @@ const Home = () => {
                 }}
               />
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                <AiOutlineUser />
+                {/* <AiOutlineUser /> */}
               </div>
             </div>
           </div>
@@ -767,23 +788,40 @@ const Home = () => {
 
       {/* Customer Modal - Moved to bottom */}
       {customerModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-800">
-                Add New Customer
-              </h2>
-              <button
-                onClick={() => setCustomerModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          <div
+            className="bg-gray-200 rounded-2xl w-full max-w-md shadow-2xl transform transition-all duration-300 animate-slideUp p-0 overflow-hidden"
+            style={{ animation: "slideUp 0.3s ease-out" }}
+          >
+            {/* Header - Green Gradient */}
+            <div className="relative bg-gradient-to-r from-green-600 to-emerald-600 p-6 rounded-t-2xl">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  ➕ Add New Customer
+                </h2>
+                <button
+                  onClick={() => setCustomerModal(false)}
+                  className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg transition-all duration-200"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Decorative Wave */}
+              <div className="absolute bottom-0 left-0 right-0">
+                <svg viewBox="0 0 1440 40" className="w-full">
+                  <path
+                    fill="#ffffff"
+                    d="M0,20 C320,40 420,0 740,20 C1060,40 1160,0 1440,20 L1440,40 L0,40 Z"
+                  />
+                </svg>
+              </div>
             </div>
 
-            <div className="space-y-4">
+            {/* Body */}
+            <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Full Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -791,14 +829,15 @@ const Home = () => {
                   name="fullName"
                   value={newCustomer.fullName}
                   onChange={handleNewCustomerChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3
+            focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
                   placeholder="Enter customer name"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Phone Number
                 </label>
                 <input
@@ -806,13 +845,14 @@ const Home = () => {
                   name="phone"
                   value={newCustomer.phone}
                   onChange={handleNewCustomerChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3
+            focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
                   placeholder="Enter phone number"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Email Address
                 </label>
                 <input
@@ -820,13 +860,14 @@ const Home = () => {
                   name="email"
                   value={newCustomer.email}
                   onChange={handleNewCustomerChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3
+            focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
                   placeholder="Enter email address"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Address
                 </label>
                 <textarea
@@ -834,29 +875,65 @@ const Home = () => {
                   value={newCustomer.address}
                   onChange={handleNewCustomerChange}
                   rows="3"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3
+            focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
                   placeholder="Enter address"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end space-x-3 mt-6">
+            {/* Footer Buttons */}
+            <div className="flex justify-end gap-3 px-6 pb-6">
               <button
                 onClick={() => setCustomerModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="px-6 py-3 text-gray-700 font-semibold border-2 border-gray-300 rounded-xl
+          hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
                 disabled={isCreatingCustomer}
               >
                 Cancel
               </button>
+
               <button
                 onClick={handleSaveNewCustomer}
                 disabled={isCreatingCustomer || !newCustomer.fullName.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl
+          hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl
+          disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isCreatingCustomer ? "Saving..." : "Save Customer"}
               </button>
             </div>
           </div>
+
+          {/* Animations */}
+          <style jsx>{`
+            @keyframes fadeIn {
+              from {
+                opacity: 0;
+              }
+              to {
+                opacity: 1;
+              }
+            }
+
+            @keyframes slideUp {
+              from {
+                opacity: 0;
+                transform: translateY(20px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+
+            .animate-fadeIn {
+              animation: fadeIn 0.3s ease-out;
+            }
+            .animate-slideUp {
+              animation: slideUp 0.3s ease-out;
+            }
+          `}</style>
         </div>
       )}
 

@@ -481,7 +481,7 @@ const BillList = () => {
                       {bill.invoiceNumber}
                     </td>
                     <td className="p-2 border border-gray-300">
-                      {bill.customer}
+                      {bill.customer?.fullName || "N/A"}
                     </td>
                     <td className="p-2 border border-gray-300">
                       {new Date(bill.salesDate).toLocaleDateString()}

@@ -8,7 +8,7 @@ const initialState = {
     email: null,
     role: null,
   },
-  hydrated: false, 
+  hydrated: false,
 };
 
 const authSlice = createSlice({
@@ -21,9 +21,9 @@ const authSlice = createSlice({
       state.token = token;
       state.user = {
         id: user.id,
-        name: user.name,
+        name: user.fullName || user.username,
+        // username: user.username,
         email: user.email,
-        role: user.role || null,
       };
     },
 

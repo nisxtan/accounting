@@ -59,6 +59,8 @@ class AuthService {
         email: user.email,
         username: user.username,
         createdAt: user.createdAt,
+        username: user.username,
+        fullName: user.fullName,
       },
       token,
     };

@@ -13,7 +13,11 @@ class BillController {
 
   async createBill(req, res, next) {
     try {
-      const billData = req.body;
+      const billData = {
+        ...req.body,
+        userId: req.user.userId,
+      };
+
       const savedBill = await billService.createCompleteBill(billData);
 
       res.status(201).json({
