@@ -632,15 +632,6 @@ const Home = () => {
               <span className="text-sm">Logout</span>
             </button>
           </div>
-
-          {/* <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 ml-4 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-            title="Logout"
-          >
-            <AiOutlineLogout />
-            <span className="text-sm">Logout</span>
-          </button> */}
         </div>
       </header>
 
@@ -663,8 +654,8 @@ const Home = () => {
         />
 
         {/* Customer Dropdown with Search and Add Button */}
-        <div className="w-full max-w-md">
-          <div className="flex items-center justify-between mb-1">
+        <div className="w-full max-w-md ">
+          <div className="flex items-center justify-between mb-1 ">
             <label className="block text-sm font-medium text-gray-700">
               Customer <span className="text-red-500">*</span>
             </label>

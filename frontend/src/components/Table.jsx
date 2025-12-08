@@ -41,7 +41,7 @@ const Table = ({
     <div className="w-full overflow-x-auto p-4">
       <table className="w-full border-collapse">
         <thead>
-          <tr className="bg-gray-400 text-left text-sm font-semibold">
+          <tr className="bg-slate-400 text-left text-sm font-semibold">
             <th className="p-2">PRODUCT*</th>
             <th className="p-2">QTY*</th>
             <th className="p-2">UNIT</th>
