@@ -1,7 +1,7 @@
 import axiosInstance from "./axios";
 
 const authService = {
-  //? register
+  //! register
   register: async (userData) => {
     try {
       const response = await axiosInstance.post("/auth/register", userData);
@@ -43,6 +43,8 @@ const authService = {
   },
 
   logout: () => {
+    console.log("i am here");
+    localStorage.clear();
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     window.location.href = "/login";

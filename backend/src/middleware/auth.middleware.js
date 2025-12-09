@@ -17,7 +17,7 @@ const authMiddleware = (req, res, next) => {
     );
     // console.log("BACKEND RECEIVED TOKEN:", req.headers.authorization);
 
-    console.log("Decoded token:", decoded); // Debug log
+    // console.log("Decoded token:", decoded); // Debug log
     req.user = decoded;
     next();
   } catch (error) {

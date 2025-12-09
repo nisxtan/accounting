@@ -4,7 +4,6 @@ import storage from "redux-persist/lib/storage";
 
 import authReducer, { setHydrated } from "./slices/authSlice";
 
-// Persist config only for auth slice
 const persistConfig = {
   key: "auth",
   storage,
@@ -24,7 +23,6 @@ export const store = configureStore({
     }),
 });
 
-// Create persistor
 export const persistor = persistStore(store);
 
 persistor.subscribe(() => {

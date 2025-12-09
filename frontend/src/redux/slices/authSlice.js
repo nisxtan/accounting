@@ -37,6 +37,7 @@ const authSlice = createSlice({
       };
 
       localStorage.removeItem("persist:auth");
+      localStorage.clear();
     },
     updateUser: (state, action) => {
       state.user = {

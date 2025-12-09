@@ -26,6 +26,7 @@ import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 import customerService from "../api/customerService";
 import { useSelector } from "react-redux";
+import { persistor } from "../redux/store";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -75,7 +76,7 @@ const Home = () => {
   // Logout function using Redux
   const handleLogout = () => {
     dispatch(logout());
-    navigate("/login");
+    persistor.purge();
   };
 
   // Load customers on component mount
