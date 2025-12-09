@@ -84,5 +84,10 @@ module.exports = new EntitySchema({
       },
       nullable: true,
     },
+    return: {
+      type: "one-to-many",
+      target: "Return",
+      inverseSide: "bill",
+    },
   },
 });
