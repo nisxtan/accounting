@@ -259,6 +259,148 @@ class ReturnService {
       });
 
       return completeReturn;
-    } catch (error) {}
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  //! Approve a return (update stock of products)
+  async approveReturn(returnId, userId) {
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const returnRepository = queryRunner.manager.getRepository("Return");
+      const returnRecord = await returnRepository.findOne({
+        where: { id: returnId },
+        relations: ["returnItems", "returnItems.product", "bill"],
+      });
+      if (!returnRecord) {
+        throw new Error(`Return ${returnId} not found`);
+      }
+      if (returnRecord.status !== "pending") {
+        throw new Error(
+          `Cannot approve return. Current status: ${returnRecord.status}`
+        );
+      }
+
+      //update product stock for each returned item
+
+      const productRepository = queryRunner.manager.getRepository("Product");
+      for (const returnItem of returnRecord.returnItems) {
+        if (returnItem.returnedQuantity > 0) {
+          await productRepository.increment(
+            {
+              id: returnItem.productId,
+            },
+            "quantity",
+            returnItem.returnedQuantity
+          );
+          console.log(
+            ` Added ${returnItem.returnedQuantity} ${returnItem.unit} back to product ${returnItem.productId}`
+          );
+        }
+      }
+
+      //update return status
+      returnRecord.status = "approved";
+      returnRecord.updatedAt = new Date();
+      await returnRepository.save(returnRecord);
+
+      //update bill's returned amount
+      const billRepository = queryRunner.manager.getRepository("SalesBill");
+      await billRepository.increment(
+        { id: returnRecord.billId },
+        "returnedAmount",
+        returnRecord.totalRefundAmount
+      );
+
+      //check if all items in bill are returned
+      const allBillItems = await queryRunner.manager
+        .getRepository("SalesItem")
+        .find({ where: { billId: returnRecord.billId } });
+
+      const totalSold = allBillItems.reduce(
+        (sum, item) => sum + item.quantity,
+        0
+      );
+
+      //get total returned across all returns for this bill
+      const allReturns = await returnRepository.find({
+        where: { billId: returnRecord.billId, status: "approved" },
+      });
+      let totalReturned = 0;
+      for (const ret of allReturns) {
+        const items = await queryRunner.manager
+          .getRepository("ReturnItem")
+          .find({ where: { returnId: ret.id } });
+        totalReturned += items.reduce((sum, item) => item.returnedQuantity, 0);
+      }
+
+      //mark bill as fully returned if all items are returned
+      if (totalReturned >= totalSold) {
+        await billRepository.update(
+          { id: returnRecord.billId },
+          { isFullyReturned: true }
+        );
+        console.log(
+          `bill ${returnRecord.originalInvoiceNumber} marked as fully returned`
+        );
+      }
+      await queryRunner.commitTransaction();
+      return returnRecord;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      queryRunner.release();
+    }
+  }
+
+  //get Return by id
+  async getReturnById(returnId) {
+    const returnRepository = AppDataSource.getRepository("Return");
+
+    const returnRecord = await returnRepository
+      .createQueryBuilder("return")
+      .leftJoinAndSelect("return.returnItems", "returnItems")
+      .leftJoinAndSelect("returnItems.product", "product")
+      .leftJoinAndSelect("returnItems.originalSalesItem", "originalSalesItem")
+      .leftJoinAndSelect("return.customer", "customer")
+      .leftJoinAndSelect("return.user", "user")
+      .where("return.id= :returnId", { returnId })
+      .getOne();
+    if (!returnRecord) {
+      throw new Error(`Return ${returnId} not found`);
+    }
+    return returnRecord;
+  }
+  // Reject a return
+  async rejectReturn(returnId, reason, userId) {
+    const returnRepository = AppDataSource.getRepository("Return");
+
+    const returnRecord = await returnRepository.findOne({
+      where: { id: returnId },
+    });
+
+    if (!returnRecord) {
+      throw new Error(`Return ${returnId} not found`);
+    }
+
+    if (returnRecord.status !== "pending") {
+      throw new Error(
+        `Cannot reject return. Current status: ${returnRecord.status}`
+      );
+    }
+
+    returnRecord.status = "rejected";
+    returnRecord.reason = reason || returnRecord.reason;
+    returnRecord.updatedAt = new Date();
+
+    return await returnRepository.save(returnRecord);
   }
 }
