@@ -4,7 +4,9 @@ const salesItemService = require("../services/salesItem.service");
 class BillController {
   async getNewInvoiceNumber(req, res) {
     try {
-      const invoiceNumber = await billService.generateInvoiceNumber();
+      const { type } = req.query; // 'sale' or 'return'
+      const prefix = type === "return" ? "RET" : "INV";
+      const invoiceNumber = await billService.generateInvoiceNumber(prefix);
       res.json({ invoiceNumber });
     } catch (error) {
       res.status(500).json({ error: error.message });

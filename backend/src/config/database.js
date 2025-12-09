@@ -6,7 +6,8 @@ const SalesBill = require("../entity/Sales-bill");
 const InvoiceReservation = require("../entity/InvoiceReservation");
 const User = require("../entity/User");
 const Customer = require("../entity/Customer");
-const Return = require("../entity/Return-Items");
+const Return = require("../entity/Return");
+const ReturnItem = require("../entity/Return-Item");
 const AppDataSource = new DataSource({
   type: "postgres",
   host: DBConfig.DB_HOST,
@@ -24,6 +25,7 @@ const AppDataSource = new DataSource({
     User,
     Customer,
     Return,
+    ReturnItem,
   ],
 });
 

@@ -23,5 +23,10 @@ module.exports = new EntitySchema({
       target: "SalesItem",
       inverseSide: "product",
     },
+    returnItems: {
+      type: "one-to-many",
+      target: "ReturnItem",
+      inverseSide: "product",
+    },
   },
 });

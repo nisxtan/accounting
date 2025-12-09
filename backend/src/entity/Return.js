@@ -1,61 +1,64 @@
 const { EntitySchema } = require("typeorm");
 
 module.exports = new EntitySchema({
-  name: "SalesBill",
-  tableName: "sales_bills",
+  name: "Return",
+  tableName: "returns",
   columns: {
     id: {
       primary: true,
       type: "int",
       generated: true,
     },
-    invoiceNumber: {
+    returnNumber: {
       type: "varchar",
-      nullable: true,
       unique: true,
+      nullable: false,
     },
-    salesDate: {
+    returnDate: {
       type: "date",
+      default: () => "CURRENT_DATE",
+      nullable: false,
+    },
+    originalInvoiceNumber: {
+      type: "varchar",
+      nullable: false,
+    },
+    billId: {
+      type: "int",
+      nullable: false,
+    },
+    customerId: {
+      type: "int",
+      nullable: false,
+    },
+    userId: {
+      type: "int",
+      nullable: false,
+    },
+    reason: {
+      type: "text",
+      nullable: true,
+    },
+    status: {
+      type: "enum",
+      enum: ["pending", "approved", "rejected", "completed"],
+      default: "pending",
     },
     subTotal: {
       type: "float",
       default: 0,
     },
-    discountPercent: {
-      type: "float",
-      default: 0,
-    },
-    discountAmount: {
-      type: "float",
-      default: 0,
-    },
-    taxableTotal: {
-      type: "float",
-      default: 0,
-    },
-    nonTaxableTotal: {
-      type: "float",
-      default: 0,
-    },
-    vatPercent: {
-      type: "int",
-      default: 13,
-    },
     vatAmount: {
       type: "float",
       default: 0,
     },
-    grandTotal: {
+    totalRefundAmount: {
       type: "float",
       default: 0,
     },
     isFullyReturned: {
       type: "boolean",
       default: false,
-    },
-    returnedAmount: {
-      type: "float",
-      default: 0,
     },
     createdAt: {
       type: "timestamp",
@@ -67,15 +70,19 @@ module.exports = new EntitySchema({
     },
   },
   relations: {
-    items: {
-      type: "one-to-many",
-      target: "SalesItem",
-      inverseSide: "bill",
+    bill: {
+      type: "many-to-one",
+      target: "SalesBill",
+      joinColumn: {
+        name: "billId",
+        referencedColumnName: "id",
+      },
+      nullable: false,
+      onDelete: "RESTRICT", // Prevent deleting original bill if returns exist
     },
     customer: {
       type: "many-to-one",
       target: "Customer",
-      inverseSide: "bills",
       joinColumn: {
         name: "customerId",
         referencedColumnName: "id",
@@ -85,17 +92,16 @@ module.exports = new EntitySchema({
     user: {
       type: "many-to-one",
       target: "User",
-      inverseSide: "salesBills",
       joinColumn: {
         name: "userId",
         referencedColumnName: "id",
       },
-      nullable: true,
+      nullable: false,
     },
-    returns: {
+    returnItems: {
       type: "one-to-many",
-      target: "Return",
-      inverseSide: "bill",
+      target: "ReturnItem",
+      inverseSide: "return",
     },
   },
 });
