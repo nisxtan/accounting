@@ -1,3 +1,264 @@
+import { AppDataSource } from "../config/database";
+import billService from "./bill.service";
+
 class ReturnService {
-    
+  //generate return number (RET-....)
+  async generateReturnNumber() {
+    return await billService.generateInvoiceNumber("RET");
+  }
+
+  //get invoice details for return
+  async getInvoiceForReturn(invoiceNumber) {
+    const billRepository = AppDataSource.getRepository("SalesBill");
+
+    const bill = await billRepository
+      .createQueryBuilder("bill")
+      .leftJoinAndSelect("bill.items", "items")
+      .leftJoinAndSelect("items.product", "product")
+      .leftJoinAndSelect("bill.customer", "customer")
+      .where("bill.invoiceNumber = :invoiceNumber", { invoiceNumber })
+      .getOne();
+
+    if (!bill) {
+      throw new Error(`Invoice ${invoiceNumber} not found`);
+    }
+
+    // Get approved returns for this invoice
+    const returnRepository = AppDataSource.getRepository("Return");
+    const approvedReturns = await returnRepository.find({
+      where: {
+        originalInvoiceNumber: invoiceNumber,
+        status: "approved",
+      },
+    });
+
+    // Calculate already returned quantities
+    const returnedQuantities = {};
+    let totalRefunded = 0;
+
+    for (const returnRecord of approvedReturns) {
+      const returnItems = await AppDataSource.getRepository("ReturnItem").find({
+        where: { returnId: returnRecord.id },
+      });
+
+      for (const returnItem of returnItems) {
+        if (returnItem.originalSalesItemId) {
+          const key = returnItem.originalSalesItemId;
+          returnedQuantities[key] =
+            (returnedQuantities[key] || 0) + returnItem.returnedQuantity;
+          totalRefunded += returnItem.refundAmount;
+        }
+      }
+    }
+
+    // Build items array with all data
+    const items = bill.items.map((item) => {
+      const alreadyReturned = returnedQuantities[item.id] || 0;
+      const availableToReturn = item.quantity - alreadyReturned;
+
+      return {
+        // READ-ONLY fields (display only)
+        id: item.id,
+        productId: item.product.id,
+        productName: item.product.name,
+        originalQuantity: item.quantity,
+        alreadyReturned: alreadyReturned,
+        availableToReturn: availableToReturn,
+        unit: item.unit,
+        rate: item.rate,
+        originalTotal: item.total,
+        isTaxable: item.isTaxable,
+
+        // EDITABLE fields (default values)
+        returnedQuantity: 0, // Default to 0, user can edit
+        refundRate: item.rate, // Default to original rate
+        reason: "", // Empty by default
+
+        // Validation helpers
+        maxQuantity: availableToReturn, // For input max attribute
+        canReturn: availableToReturn > 0, // Should this row be editable?
+        isFullyReturned: alreadyReturned >= item.quantity,
+      };
+    });
+
+    const canReturnAny = items.some((item) => item.canReturn);
+    const isFullyReturned = items.every((item) => item.isFullyReturned);
+
+    return {
+      // Invoice info
+      invoiceNumber: bill.invoiceNumber,
+      salesDate: bill.salesDate,
+      customer: {
+        id: bill.customer.id,
+        name: bill.customer.fullName || bill.customer.name,
+      },
+
+      // Items with both read-only and editable fields
+      items: items,
+
+      // Status flags
+      canReturn: canReturnAny,
+      isFullyReturned: isFullyReturned,
+
+      // Summary
+      summary: {
+        totalSold: bill.items.reduce((sum, item) => sum + item.quantity, 0),
+        totalReturned: Object.values(returnedQuantities).reduce(
+          (sum, qty) => sum + qty,
+          0
+        ),
+        totalRefunded: totalRefunded,
+        pendingReturn: items.reduce(
+          (sum, item) => sum + item.availableToReturn,
+          0
+        ),
+      },
+    };
+  }
+
+  //create a new return
+  async createReturn(returnData, userId) {
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { invoiceNumber, items, reason } = returnData;
+
+      //? validate that items have quantity to return
+
+      const validItems = items.filter(
+        (item) => item.returnedQuantity && item.returnedQuantity > 0
+      );
+      if (validItems.length === 0) {
+        throw new Error("Please return atleast one quantity of any product.");
+      }
+
+      //?get current invoice status for validation
+
+      const billRepository = queryRunner.manager.getRepository("SalesBill");
+      const bill = await billRepository
+        .createQueryBuilder("bill")
+        .leftJoinAndSelect("bill.customer", customer)
+        .where("bill.invoiceNumber =: invoiceNumber", { invoiceNumber })
+        .getOne();
+      if (!bill) {
+        throw new Error(`Invoice ${invoiceNumber} doesnot exist`);
+      }
+
+      //? generate return number
+      const returnNumber = await this.generateReturnNumber();
+
+      //?create return header
+      const returnRepository = queryRunner.manager.getRepository("Return");
+      const returnRecord = returnRepository.create({
+        returnNumber,
+        returnDate: new Date(),
+        originalInvoiceNumber: invoiceNumber,
+        billId: bill.id,
+        customerId: bill.customer.id,
+        userId: userId,
+        reason: reason || null,
+        status: "pending",
+        totalRefundAmount: 0,
+      });
+      const savedReturn = await returnRepository.save(returnRecord);
+
+      //! process return items with validation
+      let totalRefund = 0;
+      const returnItemRepository =
+        queryRunner.manager.getRepository("ReturnItem");
+
+      for (const itemData of validItems) {
+        const {
+          salesItemId,
+          returnedQuantity,
+          refundRate,
+          reason: itemReason,
+        } = itemData;
+
+        //get original sales item
+        const salesItemRepo = queryRunner.manager.getRepository("SalesItem");
+        const salesItem = await salesItemRepo.findOne({
+          where: { id: salesItemId },
+          relations: ["product", "bill"],
+        });
+        if (!salesItem) {
+          throw new Error(`Sales item ${salesItemId} not found`);
+        }
+
+        //check if it belongs to correct invoice
+        if (salesItem.bill.invoiceNumber !== invoiceNumber) {
+          throw new Error(`Item does not belong to invoice ${invoiceNumber}`);
+        }
+        //get already returned quantity(only approved)
+        const existingReturnItems = await returnItemRepository
+          .createQueryBuilder("ri")
+          .leftJoin("ri.return", "r")
+          .where("ri.originalSalesItemId =:salesItemId", { salesItemId })
+          .andWhere("r.originalInvoiceNumber = :invoiceNumber", {
+            invoiceNumber,
+          })
+          .andWhere("r.status = :status", { status: "approved" })
+          .select("SUM(ri.returnedQuantity", "totalReturned")
+          .getRawOne();
+        const alreadyReturned =
+          parseFloat(existingReturnItems?.totalReturned) || 0;
+        const maxCanReturn = salesItem.quantity - alreadyReturned;
+
+        // Validate quantity
+        if (returnedQuantity > maxCanReturn) {
+          throw new Error(
+            `Cannot return ${returnedQuantity} of "${salesItem.product?.name}". ` +
+              `Max available: ${maxCanReturn} (Already returned: ${alreadyReturned})`
+          );
+        }
+
+        // Calculate refund
+        const finalRefundRate = refundRate || salesItem.rate;
+        const refundAmount = returnedQuantity * finalRefundRate;
+        totalRefund += refundAmount;
+
+        // Create return item
+        const returnItem = returnItemRepository.create({
+          returnId: savedReturn.id,
+          productId: salesItem.productId,
+          originalSalesItemId: salesItemId,
+          originalQuantity: salesItem.quantity,
+          returnedQuantity,
+          unit: salesItem.unit,
+          originalRate: salesItem.rate,
+          refundRate: finalRefundRate,
+          originalTotal: salesItem.total,
+          refundAmount,
+          isTaxable: salesItem.isTaxable,
+          reason: itemReason || null,
+        });
+
+        await returnItemRepository.save(returnItem);
+      }
+
+      // Update return total
+      savedReturn.totalRefundAmount = totalRefund;
+      await returnRepository.save(savedReturn);
+
+      // Mark return number as used
+      await BillService.markInvoiceNumberAsUsed(returnNumber);
+
+      await queryRunner.commitTransaction();
+
+      //Return complete data
+      const completeReturn = await returnRepository.findOne({
+        where: { id: savedReturn.id },
+        relations: [
+          "returnItems",
+          "returnItems.product",
+          "customer",
+          "bill",
+          "user",
+        ],
+      });
+
+      return completeReturn;
+    } catch (error) {}
+  }
 }
