@@ -1,5 +1,6 @@
-import { AppDataSource } from "../config/database";
-import billService from "./bill.service";
+const { AppDataSource } = require("../config/database");
+
+const billService = require("./bill.service");
 
 class ReturnService {
   //generate return number (RET-....)
@@ -138,8 +139,8 @@ class ReturnService {
       const billRepository = queryRunner.manager.getRepository("SalesBill");
       const bill = await billRepository
         .createQueryBuilder("bill")
-        .leftJoinAndSelect("bill.customer", customer)
-        .where("bill.invoiceNumber =: invoiceNumber", { invoiceNumber })
+        .leftJoinAndSelect("bill.customer", "customer")
+        .where("bill.invoiceNumber = :invoiceNumber", { invoiceNumber })
         .getOne();
       if (!bill) {
         throw new Error(`Invoice ${invoiceNumber} doesnot exist`);
@@ -199,7 +200,7 @@ class ReturnService {
             invoiceNumber,
           })
           .andWhere("r.status = :status", { status: "approved" })
-          .select("SUM(ri.returnedQuantity", "totalReturned")
+          .select("SUM(ri.returnedQuantity)", "totalReturned")
           .getRawOne();
         const alreadyReturned =
           parseFloat(existingReturnItems?.totalReturned) || 0;
@@ -242,7 +243,7 @@ class ReturnService {
       await returnRepository.save(savedReturn);
 
       // Mark return number as used
-      await BillService.markInvoiceNumberAsUsed(returnNumber);
+      await billService.markInvoiceNumberAsUsed(returnNumber);
 
       await queryRunner.commitTransaction();
 
@@ -357,7 +358,7 @@ class ReturnService {
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
-      queryRunner.release();
+      await queryRunner.release();
     }
   }
 
@@ -379,7 +380,9 @@ class ReturnService {
     }
     return returnRecord;
   }
-  // Reject a return
+
+  //? Reject a return
+
   async rejectReturn(returnId, reason, userId) {
     const returnRepository = AppDataSource.getRepository("Return");
 
@@ -403,4 +406,81 @@ class ReturnService {
 
     return await returnRepository.save(returnRecord);
   }
+
+  // Add this method to your ReturnService class
+  async getAllReturns(filters = {}) {
+    const returnRepository = AppDataSource.getRepository("Return");
+    const queryBuilder = returnRepository
+      .createQueryBuilder("return")
+      .leftJoinAndSelect("return.customer", "customer")
+      .leftJoinAndSelect("return.bill", "bill")
+      .leftJoinAndSelect("return.user", "user")
+      .orderBy("return.createdAt", "DESC");
+
+    if (filters.invoiceNumber) {
+      queryBuilder.andWhere("return.originalInvoiceNumber = :invoiceNumber", {
+        invoiceNumber: filters.invoiceNumber,
+      });
+    }
+
+    if (filters.customerId) {
+      queryBuilder.andWhere("return.customerId = :customerId", {
+        customerId: filters.customerId,
+      });
+    }
+
+    if (filters.status) {
+      queryBuilder.andWhere("return.status = :status", {
+        status: filters.status,
+      });
+    }
+
+    if (filters.startDate) {
+      queryBuilder.andWhere("return.returnDate >= :startDate", {
+        startDate: filters.startDate,
+      });
+    }
+
+    if (filters.endDate) {
+      queryBuilder.andWhere("return.returnDate <= :endDate", {
+        endDate: filters.endDate,
+      });
+    }
+
+    const page = parseInt(filters.page) || 1;
+    const limit = parseInt(filters.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    queryBuilder.skip(skip).take(limit);
+
+    const [returns, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      returns,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1,
+      },
+    };
+  }
+
+  async getReturnsByInvoice(invoiceNumber) {
+    const returnRepository = AppDataSource.getRepository("Return");
+
+    const returns = await returnRepository
+      .createQueryBuilder("return")
+      .leftJoinAndSelect("return.returnItems", "returnItems")
+      .leftJoinAndSelect("returnItems.product", "product")
+      .where("return.originalInvoiceNumber = :invoiceNumber", { invoiceNumber })
+      .orderBy("return.returnDate", "DESC")
+      .getMany();
+
+    return returns;
+  }
 }
+
+module.exports = new ReturnService();
