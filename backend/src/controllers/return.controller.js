@@ -1,4 +1,3 @@
-const { useId } = require("react");
 const returnService = require("../services/return.service");
 class ReturnController {
   // get new return number
