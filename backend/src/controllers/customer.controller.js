@@ -15,7 +15,7 @@ class CustomerController {
         return res.status(401).json({ error: "User not authenticated" });
       }
 
-      console.log("Creating customer with userId:", userId); // Debug log
+      // console.log("Creating customer with userId:", userId); // Debug log
 
       const customer = await customerService.createCustomer(
         {

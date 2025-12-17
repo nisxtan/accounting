@@ -25,7 +25,7 @@ const updateProductRates = async () => {
       Chicken: 150,
     };
 
-    console.log("Updating product rates...");
+    // console.log("Updating product rates...");
 
     // Get all existing products
     const existingProducts = await productRepository.find();
@@ -35,11 +35,11 @@ const updateProductRates = async () => {
       if (productRates[product.name]) {
         product.baseRate = productRates[product.name];
         await productRepository.save(product);
-        console.log(`Updated ${product.name}: ${product.baseRate}`);
+        // console.log(`Updated ${product.name}: ${product.baseRate}`);
       }
     }
 
-    console.log("All product rates updated successfully!");
+    // console.log("All product rates updated successfully!");
     await AppDataSource.destroy();
   } catch (error) {
     console.error("Error updating product rates:", error);

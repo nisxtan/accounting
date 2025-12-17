@@ -15,17 +15,17 @@ axiosInstance.interceptors.request.use(
     // Get token from Redux store
     const state = store.getState();
     const token = state.auth.token;
-    console.log("TOKEN SENT TO BACKEND:", token);
+    // console.log("TOKEN SENT TO BACKEND:", token);
 
     // Add token to headers if it exists
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    console.log("Request config:", {
-      url: config.url,
-      hasToken: !!token,
-    }); // Debug log
+    // console.log("Request config:", {
+    //   url: config.url,
+    //   hasToken: !!token,
+    // }); // Debug log
 
     return config;
   },
@@ -36,7 +36,7 @@ axiosInstance.interceptors.request.use(
 
 axiosInstance.interceptors.response.use(
   (response) => {
-    console.log("Response received:", response.data);
+    // console.log("Response received:", response.data);
     return response;
   },
   (error) => {

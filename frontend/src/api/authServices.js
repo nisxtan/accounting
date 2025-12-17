@@ -43,7 +43,7 @@ const authService = {
   },
 
   logout: () => {
-    console.log("i am here");
+    // console.log("i am here");
     localStorage.clear();
     localStorage.removeItem("token");
     localStorage.removeItem("user");

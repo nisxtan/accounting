@@ -13,13 +13,14 @@ import Register from "./pages/Register";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useSelector } from "react-redux";
 import { selectIsAuthenticated } from "./redux/slices/authSlice";
+import ReturnPage from "./pages/ReturnPage";
 
 const App = () => {
   const isAuthenticated = useSelector(selectIsAuthenticated);
-  console.log(
-    "TOKEN:",
-    useSelector((state) => state.auth.token)
-  );
+  // console.log(
+  //   "TOKEN:",
+  //   useSelector((state) => state.auth.token)
+  // );
 
   return (
     <Router>
@@ -42,6 +43,14 @@ const App = () => {
           element={
             <ProtectedRoute>
               <Home />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/return"
+          element={
+            <ProtectedRoute>
+              <ReturnPage />
             </ProtectedRoute>
           }
         />

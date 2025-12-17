@@ -3,12 +3,10 @@ const { AppDataSource } = require("../config/database");
 const billService = require("./bill.service");
 
 class ReturnService {
-  //generate return number (RET-....)
   async generateReturnNumber() {
     return await billService.generateInvoiceNumber("RET");
   }
 
-  //get invoice details for return
   async getInvoiceForReturn(invoiceNumber) {
     const billRepository = AppDataSource.getRepository("SalesBill");
 
@@ -24,7 +22,6 @@ class ReturnService {
       throw new Error(`Invoice ${invoiceNumber} not found`);
     }
 
-    // Get approved returns for this invoice
     const returnRepository = AppDataSource.getRepository("Return");
     const approvedReturns = await returnRepository.find({
       where: {
@@ -33,7 +30,6 @@ class ReturnService {
       },
     });
 
-    // Calculate already returned quantities
     const returnedQuantities = {};
     let totalRefunded = 0;
 
@@ -43,22 +39,22 @@ class ReturnService {
       });
 
       for (const returnItem of returnItems) {
-        if (returnItem.originalSalesItemId) {
-          const key = returnItem.originalSalesItemId;
-          returnedQuantities[key] =
-            (returnedQuantities[key] || 0) + returnItem.returnedQuantity;
+        const salesItemId =
+          returnItem.originalSalesItemId || returnItem.originalSalesItemid;
+        if (salesItemId) {
+          returnedQuantities[salesItemId] =
+            (returnedQuantities[salesItemId] || 0) +
+            returnItem.returnedQuantity;
           totalRefunded += returnItem.refundAmount;
         }
       }
     }
 
-    // Build items array with all data
     const items = bill.items.map((item) => {
       const alreadyReturned = returnedQuantities[item.id] || 0;
       const availableToReturn = item.quantity - alreadyReturned;
 
       return {
-        // READ-ONLY fields (display only)
         id: item.id,
         productId: item.product.id,
         productName: item.product.name,
@@ -69,15 +65,11 @@ class ReturnService {
         rate: item.rate,
         originalTotal: item.total,
         isTaxable: item.isTaxable,
-
-        // EDITABLE fields (default values)
-        returnedQuantity: 0, // Default to 0, user can edit
-        refundRate: item.rate, // Default to original rate
-        reason: "", // Empty by default
-
-        // Validation helpers
-        maxQuantity: availableToReturn, // For input max attribute
-        canReturn: availableToReturn > 0, // Should this row be editable?
+        returnedQuantity: 0,
+        refundRate: item.rate,
+        reason: "",
+        maxQuantity: availableToReturn,
+        canReturn: availableToReturn > 0,
         isFullyReturned: alreadyReturned >= item.quantity,
       };
     });
@@ -86,22 +78,15 @@ class ReturnService {
     const isFullyReturned = items.every((item) => item.isFullyReturned);
 
     return {
-      // Invoice info
       invoiceNumber: bill.invoiceNumber,
       salesDate: bill.salesDate,
       customer: {
         id: bill.customer.id,
         name: bill.customer.fullName || bill.customer.name,
       },
-
-      // Items with both read-only and editable fields
       items: items,
-
-      // Status flags
       canReturn: canReturnAny,
       isFullyReturned: isFullyReturned,
-
-      // Summary
       summary: {
         totalSold: bill.items.reduce((sum, item) => sum + item.quantity, 0),
         totalReturned: Object.values(returnedQuantities).reduce(
@@ -117,7 +102,6 @@ class ReturnService {
     };
   }
 
-  //create a new return
   async createReturn(returnData, userId) {
     const queryRunner = AppDataSource.createQueryRunner();
     await queryRunner.connect();
@@ -125,16 +109,13 @@ class ReturnService {
     try {
       const { invoiceNumber, items, reason } = returnData;
 
-      //? validate that items have quantity to return
-
       const validItems = items.filter(
         (item) => item.returnedQuantity && item.returnedQuantity > 0
       );
+      // console.log("Valid items", validItems);
       if (validItems.length === 0) {
-        throw new Error("Please return atleast one quantity of any product.");
+        throw new Error("Please return at least one quantity of any product.");
       }
-
-      //?get current invoice status for validation
 
       const billRepository = queryRunner.manager.getRepository("SalesBill");
       const bill = await billRepository
@@ -143,13 +124,11 @@ class ReturnService {
         .where("bill.invoiceNumber = :invoiceNumber", { invoiceNumber })
         .getOne();
       if (!bill) {
-        throw new Error(`Invoice ${invoiceNumber} doesnot exist`);
+        throw new Error(`Invoice ${invoiceNumber} does not exist`);
       }
 
-      //? generate return number
       const returnNumber = await this.generateReturnNumber();
 
-      //?create return header
       const returnRepository = queryRunner.manager.getRepository("Return");
       const returnRecord = returnRepository.create({
         returnNumber,
@@ -164,49 +143,48 @@ class ReturnService {
       });
       const savedReturn = await returnRepository.save(returnRecord);
 
-      //! process return items with validation
       let totalRefund = 0;
       const returnItemRepository =
         queryRunner.manager.getRepository("ReturnItem");
 
       for (const itemData of validItems) {
         const {
-          salesItemId,
+          originalSalesItemId,
           returnedQuantity,
           refundRate,
           reason: itemReason,
         } = itemData;
 
-        //get original sales item
         const salesItemRepo = queryRunner.manager.getRepository("SalesItem");
         const salesItem = await salesItemRepo.findOne({
-          where: { id: salesItemId },
+          where: { id: originalSalesItemId },
           relations: ["product", "bill"],
         });
         if (!salesItem) {
-          throw new Error(`Sales item ${salesItemId} not found`);
+          throw new Error(`Sales item ${originalSalesItemId} not found`);
         }
 
-        //check if it belongs to correct invoice
         if (salesItem.bill.invoiceNumber !== invoiceNumber) {
           throw new Error(`Item does not belong to invoice ${invoiceNumber}`);
         }
-        //get already returned quantity(only approved)
+
         const existingReturnItems = await returnItemRepository
           .createQueryBuilder("ri")
           .leftJoin("ri.return", "r")
-          .where("ri.originalSalesItemId =:salesItemId", { salesItemId })
+          .where("ri.originalSalesItemid = :salesItemId", {
+            salesItemId: originalSalesItemId,
+          })
           .andWhere("r.originalInvoiceNumber = :invoiceNumber", {
-            invoiceNumber,
+            invoiceNumber: invoiceNumber,
           })
           .andWhere("r.status = :status", { status: "approved" })
           .select("SUM(ri.returnedQuantity)", "totalReturned")
           .getRawOne();
+
         const alreadyReturned =
           parseFloat(existingReturnItems?.totalReturned) || 0;
         const maxCanReturn = salesItem.quantity - alreadyReturned;
 
-        // Validate quantity
         if (returnedQuantity > maxCanReturn) {
           throw new Error(
             `Cannot return ${returnedQuantity} of "${salesItem.product?.name}". ` +
@@ -214,23 +192,19 @@ class ReturnService {
           );
         }
 
-        // Calculate refund
         const finalRefundRate = refundRate || salesItem.rate;
         const refundAmount = returnedQuantity * finalRefundRate;
         totalRefund += refundAmount;
 
-        // Create return item
         const returnItem = returnItemRepository.create({
           returnId: savedReturn.id,
           productId: salesItem.productId,
-          originalSalesItemId: salesItemId,
+          originalSalesItemid: originalSalesItemId,
           originalQuantity: salesItem.quantity,
           returnedQuantity,
           unit: salesItem.unit,
           originalRate: salesItem.rate,
-          refundRate: finalRefundRate,
-          originalTotal: salesItem.total,
-          refundAmount,
+          returnedRate: finalRefundRate,
           isTaxable: salesItem.isTaxable,
           reason: itemReason || null,
         });
@@ -238,16 +212,13 @@ class ReturnService {
         await returnItemRepository.save(returnItem);
       }
 
-      // Update return total
       savedReturn.totalRefundAmount = totalRefund;
       await returnRepository.save(savedReturn);
 
-      // Mark return number as used
       await billService.markInvoiceNumberAsUsed(returnNumber);
 
       await queryRunner.commitTransaction();
 
-      //Return complete data
       const completeReturn = await returnRepository.findOne({
         where: { id: savedReturn.id },
         relations: [
@@ -262,13 +233,14 @@ class ReturnService {
       return completeReturn;
     } catch (error) {
       await queryRunner.rollbackTransaction();
+      console.error("Error creating return:", error.message);
+      console.error("Stack trace:", error.stack);
       throw error;
     } finally {
       await queryRunner.release();
     }
   }
 
-  //! Approve a return (update stock of products)
   async approveReturn(returnId, userId) {
     const queryRunner = AppDataSource.createQueryRunner();
     await queryRunner.connect();
@@ -289,8 +261,6 @@ class ReturnService {
         );
       }
 
-      //update product stock for each returned item
-
       const productRepository = queryRunner.manager.getRepository("Product");
       for (const returnItem of returnRecord.returnItems) {
         if (returnItem.returnedQuantity > 0) {
@@ -301,18 +271,16 @@ class ReturnService {
             "quantity",
             returnItem.returnedQuantity
           );
-          console.log(
-            ` Added ${returnItem.returnedQuantity} ${returnItem.unit} back to product ${returnItem.productId}`
-          );
+          // console.log(
+          //   ` Added ${returnItem.returnedQuantity} ${returnItem.unit} back to product ${returnItem.productId}`
+          // );
         }
       }
 
-      //update return status
       returnRecord.status = "approved";
       returnRecord.updatedAt = new Date();
       await returnRepository.save(returnRecord);
 
-      //update bill's returned amount
       const billRepository = queryRunner.manager.getRepository("SalesBill");
       await billRepository.increment(
         { id: returnRecord.billId },
@@ -320,7 +288,6 @@ class ReturnService {
         returnRecord.totalRefundAmount
       );
 
-      //check if all items in bill are returned
       const allBillItems = await queryRunner.manager
         .getRepository("SalesItem")
         .find({ where: { billId: returnRecord.billId } });
@@ -330,7 +297,6 @@ class ReturnService {
         0
       );
 
-      //get total returned across all returns for this bill
       const allReturns = await returnRepository.find({
         where: { billId: returnRecord.billId, status: "approved" },
       });
@@ -339,18 +305,20 @@ class ReturnService {
         const items = await queryRunner.manager
           .getRepository("ReturnItem")
           .find({ where: { returnId: ret.id } });
-        totalReturned += items.reduce((sum, item) => item.returnedQuantity, 0);
+        totalReturned += items.reduce(
+          (sum, item) => sum + item.returnedQuantity,
+          0
+        );
       }
 
-      //mark bill as fully returned if all items are returned
       if (totalReturned >= totalSold) {
         await billRepository.update(
           { id: returnRecord.billId },
           { isFullyReturned: true }
         );
-        console.log(
-          `bill ${returnRecord.originalInvoiceNumber} marked as fully returned`
-        );
+        // console.log(
+        //   `bill ${returnRecord.originalInvoiceNumber} marked as fully returned`
+        // );
       }
       await queryRunner.commitTransaction();
       return returnRecord;
@@ -362,7 +330,6 @@ class ReturnService {
     }
   }
 
-  //get Return by id
   async getReturnById(returnId) {
     const returnRepository = AppDataSource.getRepository("Return");
 
@@ -380,8 +347,6 @@ class ReturnService {
     }
     return returnRecord;
   }
-
-  //? Reject a return
 
   async rejectReturn(returnId, reason, userId) {
     const returnRepository = AppDataSource.getRepository("Return");
@@ -407,7 +372,6 @@ class ReturnService {
     return await returnRepository.save(returnRecord);
   }
 
-  // Add this method to your ReturnService class
   async getAllReturns(filters = {}) {
     const returnRepository = AppDataSource.getRepository("Return");
     const queryBuilder = returnRepository

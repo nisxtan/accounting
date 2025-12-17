@@ -260,10 +260,10 @@ class BillService {
       availableReservation.inProgress = true;
       availableReservation.lastUsed = new Date();
       const updated = await reservationRepository.save(availableReservation);
-      console.log(
-        `📝 Reusing available ${prefix} reservation:`,
-        updated.invoiceNumber
-      );
+      // console.log(
+      //   `📝 Reusing available ${prefix} reservation:`,
+      //   updated.invoiceNumber
+      // );
       return updated.invoiceNumber;
     }
 
@@ -295,7 +295,7 @@ class BillService {
     });
 
     const saved = await reservationRepository.save(newReservation);
-    console.log(`Created new ${prefix} reservation:`, saved.invoiceNumber);
+    // console.log(`Created new ${prefix} reservation:`, saved.invoiceNumber);
     return saved.invoiceNumber;
   }
 
@@ -315,10 +315,10 @@ class BillService {
         .execute();
 
       if (result.affected > 0) {
-        console.log(`✅ Successfully marked as used:`, invoiceNumber);
+        // console.log(`✅ Successfully marked as used:`, invoiceNumber);
         return true;
       } else {
-        console.log(`⚠️ Invoice not found:`, invoiceNumber);
+        // console.log(`⚠️ Invoice not found:`, invoiceNumber);
         return false;
       }
     } catch (error) {

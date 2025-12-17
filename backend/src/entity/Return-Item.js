@@ -52,7 +52,7 @@ module.exports = new EntitySchema({
       type: "many-to-one",
       target: "SalesItem",
       joinColumn: {
-        name: "originalSalesItemId",
+        name: "originalSalesItemid",
         referencedColumnName: "id",
       },
       nullable: false,

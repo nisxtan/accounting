@@ -62,7 +62,7 @@ class ReturnController {
         });
       }
 
-      const savedReturn = await returnService.createReturn(returnData, useId);
+      const savedReturn = await returnService.createReturn(returnData, userId);
 
       res.status(201).json({
         message: "Return created successfully",

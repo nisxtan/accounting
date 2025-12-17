@@ -39,7 +39,7 @@ export const useBill = () => {
   const getInvoiceNumberFromBackend = useCallback(async () => {
     try {
       const response = await billService.getNewInvoiceNumber();
-      console.log("Invoice number received:", response.data.invoiceNumber);
+      // console.log("Invoice number received:", response.data.invoiceNumber);
 
       setBillData((prev) => ({
         ...prev,
@@ -177,7 +177,7 @@ export const useBill = () => {
         items: items.filter((item) => item.productId && item.rate > 0),
       };
 
-      console.log("Saving bill with payload:", billPayload);
+      // console.log("Saving bill with payload:", billPayload);
 
       const savedBill = await billService.create(billPayload);
 

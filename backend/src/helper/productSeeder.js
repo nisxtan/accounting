@@ -84,7 +84,7 @@ const seedProducts = async () => {
     ];
 
     await productRepository.save(products);
-    console.log("Products seeded successfully");
+    // console.log("Products seeded successfully");
     await AppDataSource.destroy();
   } catch (error) {
     console.error("Error seeding products.", error);

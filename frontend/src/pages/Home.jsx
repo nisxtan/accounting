@@ -32,7 +32,7 @@ const Home = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
-  console.log("user", user);
+  // console.log("user", user);
   const {
     items,
     products,
@@ -62,7 +62,7 @@ const Home = () => {
 
   const handleProductAdded = async (newProduct) => {
     await loadProducts();
-    console.log("products reloaded");
+    // console.log("products reloaded");
   };
 
   const handleAddProductClick = () => {
@@ -540,7 +540,7 @@ const Home = () => {
     try {
       const result = await saveBill();
       alert("Bill saved successfully!");
-      console.log("Saved bill:", result);
+      // console.log("Saved bill:", result);
       printBill(billData, items, totals);
       setTimeout(() => {
         window.location.reload();
@@ -565,7 +565,7 @@ const Home = () => {
     try {
       const result = await saveBill();
       alert("Bill saved successfully!");
-      console.log("Saved bill:", result);
+      // console.log("Saved bill:", result);
       downloadExcel(billData, items, totals, products);
       printBill(billData, items, totals);
       setTimeout(() => {
