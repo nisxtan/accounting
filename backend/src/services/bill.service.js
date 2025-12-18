@@ -335,6 +335,8 @@ class BillService {
         .leftJoinAndSelect("bill.items", "items")
         .leftJoinAndSelect("items.product", "product")
         .leftJoinAndSelect("bill.returns", "returns")
+        .leftJoinAndSelect("returns.returnItems", "returnItems")
+        .leftJoinAndSelect("returnItems.product", "returnItemProduct")
         .orderBy("bill.invoiceNumber", "ASC");
 
       if (filters.customerName) {

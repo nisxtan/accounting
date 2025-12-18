@@ -7,6 +7,8 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { useNavigate } from "react-router-dom";
 import BillDetailModal from "../components/BillDetailModal";
+import ReturnDetailModal from "../components/ReturnDetailModal";
+// import ReturnDetailModal from "../components/ReturnDetailModal";
 
 const BillList = () => {
   const navigate = useNavigate();
@@ -14,8 +16,9 @@ const BillList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [printingBill, setPrintingBill] = useState(null);
-  const [selectedBill, setSelectedBill] = useState(null); // For modal
-  const [loadingDetails, setLoadingDetails] = useState(false); // For fetching details
+  const [selectedBill, setSelectedBill] = useState(null);
+  const [selectedReturnBill, setSelectedReturnBill] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   const [filters, setFilters] = useState({
     customerName: "",
@@ -38,7 +41,6 @@ const BillList = () => {
 
   const inputRefs = {
     customerName: useRef(null),
-    isTaxable: useRef(null),
     minTotal: useRef(null),
     maxTotal: useRef(null),
   };
@@ -106,16 +108,7 @@ const BillList = () => {
 
   const handleViewDetails = async (bill) => {
     try {
-      // console.log(bill);
       setLoadingDetails(true);
-
-      // If bill already has items, show it directly
-      if (bill.items && bill.items.length > 0) {
-        setSelectedBill(bill);
-        return;
-      }
-
-      // Otherwise, fetch full details
       const detailedBill = await billService.getBillDetails(bill.invoiceNumber);
       setSelectedBill(detailedBill);
     } catch (error) {
@@ -124,6 +117,10 @@ const BillList = () => {
     } finally {
       setLoadingDetails(false);
     }
+  };
+
+  const handleViewReturnDetails = (bill) => {
+    setSelectedReturnBill(bill);
   };
 
   const handleFilterChange = (filterName, value) => {
@@ -150,7 +147,6 @@ const BillList = () => {
   const downloadExcel = async (bill) => {
     try {
       let detailedBill = bill;
-
       if (!bill.items || bill.items.length === 0) {
         detailedBill = await billService.getBillDetails(bill.invoiceNumber);
       }
@@ -206,7 +202,6 @@ const BillList = () => {
       const excelBuffer = XLSX.write(workbook, {
         bookType: "xlsx",
         type: "array",
-        cellStyles: true,
       });
 
       const blob = new Blob([excelBuffer], {
@@ -223,7 +218,6 @@ const BillList = () => {
   const handlePrintBill = async (bill) => {
     try {
       setPrintingBill(bill.invoiceNumber);
-
       if (bill.items && bill.items.length > 0) {
         printBillDetails(bill);
       } else {
@@ -244,7 +238,6 @@ const BillList = () => {
     if (!printWindow) return alert("Enable pop-ups to print.");
 
     const items = bill.items || [];
-
     const itemsHTML = items
       .map(
         (item, index) => `
@@ -257,19 +250,20 @@ const BillList = () => {
         <td>${item.discountPercent}%</td>
         <td>${item.isTaxable ? "Yes" : "No"}</td>
         <td>Rs. ${item.total.toFixed(2)}</td>
-      </tr>`
+      </tr>
+    `
       )
       .join("");
 
     const htmlContent = `
       <html>
-        <body>
+        <body style="font-family: Arial, sans-serif; padding: 20px;">
           <h1>Sales Invoice</h1>
           <h3>Invoice #: ${bill.invoiceNumber}</h3>
           <h3>Customer: ${bill.customer.fullName}</h3>
           <h3>Date: ${new Date(bill.salesDate).toLocaleDateString()}</h3>
 
-          <table border="1" cellspacing="0" cellpadding="6" width="100%">
+          <table border="1" cellspacing="0" cellpadding="6" width="100%" style="margin-top: 20px;">
             <thead>
               <tr>
                 <th>S.N.</th>
@@ -287,9 +281,11 @@ const BillList = () => {
             </tbody>
           </table>
 
-          <h3>Discount: ${bill.discountPercent}%</h3>
-          <h3>VAT: ${bill.vatPercent}%</h3>
-          <h2>Grand Total: Rs. ${bill.grandTotal?.toFixed(2)}</h2>
+          <div style="margin-top: 30px;">
+            <h3>Discount: ${bill.discountPercent}%</h3>
+            <h3>VAT: ${bill.vatPercent}%</h3>
+            <h2>Grand Total: Rs. ${bill.grandTotal?.toFixed(2)}</h2>
+          </div>
 
           <script>
             window.onload = () => setTimeout(() => window.print(), 250);
@@ -306,16 +302,13 @@ const BillList = () => {
 
   return (
     <>
-      {/* Filters */}
       <div className="p-4 bg-white grid grid-cols-1 md:grid-cols-5 gap-4 ml-39 mt-5">
         <div>
           <button
             onClick={() => navigate("/sales")}
-            className="px-4 py-2 bg-green-300 text-black font-medium rounded-lg 
-             shadow-sm hover:bg-green-400 hover:shadow-md mt-5 ml--10
-             transition-all duration-200"
+            className="px-4 py-2 bg-green-300 text-black font-medium rounded-lg shadow-sm hover:bg-green-400 hover:shadow-md mt-5 ml--10 transition-all duration-200"
           >
-             {"<--Back to Home"}
+            {"<--Back to Home"}
           </button>
         </div>
         <div>
@@ -338,7 +331,6 @@ const BillList = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
           />
         </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Min Total
@@ -360,7 +352,6 @@ const BillList = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
           />
         </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Max Total
@@ -382,7 +373,6 @@ const BillList = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
           />
         </div>
-
         <div className="flex items-end">
           <button
             onClick={clearFilters}
@@ -397,7 +387,6 @@ const BillList = () => {
         <div className="p-4 text-center text-gray-500">Loading Bills...</div>
       )}
 
-      {/* Table */}
       <div className="border-t w-full overflow-x-auto p-4 mt-8">
         <table className="w-full border-collapse border border-gray-300 mt-10">
           <thead>
@@ -413,7 +402,6 @@ const BillList = () => {
               </th>
             </tr>
           </thead>
-
           <tbody>
             {bills.length === 0 ? (
               <tr>
@@ -426,13 +414,21 @@ const BillList = () => {
               </tr>
             ) : (
               bills.map((bill) => {
+                const hasReturns = bill.returns && bill.returns.length > 0;
                 return (
                   <tr
                     key={bill.invoiceNumber}
                     className="border-b hover:bg-gray-50"
                   >
                     <td className="p-2 border border-gray-300 font-medium">
-                      {bill.invoiceNumber}
+                      <div className="flex items-center gap-2">
+                        {bill.invoiceNumber}
+                        {hasReturns && (
+                          <span className="bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded-full font-medium">
+                            RET
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-2 border border-gray-300">
                       {bill.customer?.fullName || "N/A"}
@@ -449,37 +445,45 @@ const BillList = () => {
                     <td className="p-2 border border-gray-300 font-bold text-green-700">
                       Rs. {bill.grandTotal?.toFixed(2)}
                     </td>
-
-                    {/* ACTION BUTTONS */}
                     <td className="p-2 border border-gray-300 text-center">
-                      <div className="flex gap-2 justify-center">
-                        {/* Details Button */}
+                      <div className="flex flex-wrap gap-2 justify-center">
                         <button
                           onClick={() => handleViewDetails(bill)}
                           disabled={loadingDetails}
-                          className="bg-yellow-500 text-white px-3 py-1 rounded-md hover:bg-yellow-600 disabled:bg-yellow-300"
+                          className="bg-yellow-500 text-white px-3 py-1 rounded-md hover:bg-yellow-600 disabled:bg-yellow-300 text-sm"
                         >
-                          {loadingDetails ? "Loading..." : "Details"}
+                          Details
                         </button>
 
-                        {/* Print Button */}
                         <button
                           onClick={() => handlePrintBill(bill)}
                           disabled={printingBill === bill.invoiceNumber}
-                          className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+                          className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 disabled:bg-blue-300 text-sm"
                         >
                           {printingBill === bill.invoiceNumber
-                            ? "Loading..."
+                            ? "..."
                             : "Print"}
                         </button>
 
-                        {/* Excel Button */}
                         <button
                           onClick={() => downloadExcel(bill)}
                           className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 flex items-center justify-center"
                           title="Download Excel"
                         >
-                          <AiFillFileExcel size={20} />
+                          <AiFillFileExcel size={18} />
+                        </button>
+
+                        <button
+                          onClick={() => handleViewReturnDetails(bill)}
+                          disabled={!hasReturns}
+                          className={`text-white px-3 py-1 rounded-md text-sm transition-colors ${
+                            hasReturns
+                              ? "bg-red-500 hover:bg-red-600 cursor-pointer"
+                              : "bg-gray-100 cursor-not-allowed opacity-50"
+                          }`}
+                          style={{ minWidth: "110px" }}
+                        >
+                          Return Details
                         </button>
                       </div>
                     </td>
@@ -490,7 +494,6 @@ const BillList = () => {
           </tbody>
         </table>
 
-        {/* Pagination */}
         {pagination.totalPages > 0 && (
           <div className="mt-6 flex justify-center">
             <Stack spacing={2}>
@@ -507,11 +510,17 @@ const BillList = () => {
         )}
       </div>
 
-      {/* Bill Detail Modal */}
       {selectedBill && (
         <BillDetailModal
           bill={selectedBill}
           onClose={() => setSelectedBill(null)}
+        />
+      )}
+
+      {selectedReturnBill && (
+        <ReturnDetailModal
+          bill={selectedReturnBill}
+          onClose={() => setSelectedReturnBill(null)}
         />
       )}
     </>
