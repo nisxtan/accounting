@@ -106,6 +106,7 @@ const BillList = () => {
 
   const handleViewDetails = async (bill) => {
     try {
+      // console.log(bill);
       setLoadingDetails(true);
 
       // If bill already has items, show it directly
@@ -314,7 +315,7 @@ const BillList = () => {
              shadow-sm hover:bg-green-400 hover:shadow-md mt-5 ml--10
              transition-all duration-200"
           >
-            Back to Home
+             {"<--Back to Home"}
           </button>
         </div>
         <div>
