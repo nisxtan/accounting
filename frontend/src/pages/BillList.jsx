@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import billService from "../api/billServices";
 import Pagination from "@mui/material/Pagination";
 import Stack from "@mui/material/Stack";
-
-import { AiFillFileExcel } from "react-icons/ai"; // Excel icon
+import { AiFillFileExcel } from "react-icons/ai";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import BillDetailModal from "../components/BillDetailModal";
 
 const BillList = () => {
   const navigate = useNavigate();
@@ -14,6 +14,9 @@ const BillList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [printingBill, setPrintingBill] = useState(null);
+  const [selectedBill, setSelectedBill] = useState(null); // For modal
+  const [loadingDetails, setLoadingDetails] = useState(false); // For fetching details
+
   const [filters, setFilters] = useState({
     customerName: "",
     minTotal: "",
@@ -101,6 +104,27 @@ const BillList = () => {
     }
   };
 
+  const handleViewDetails = async (bill) => {
+    try {
+      setLoadingDetails(true);
+
+      // If bill already has items, show it directly
+      if (bill.items && bill.items.length > 0) {
+        setSelectedBill(bill);
+        return;
+      }
+
+      // Otherwise, fetch full details
+      const detailedBill = await billService.getBillDetails(bill.invoiceNumber);
+      setSelectedBill(detailedBill);
+    } catch (error) {
+      console.error("Failed to load bill details:", error);
+      alert("Failed to load bill details. Please try again.");
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
   const handleFilterChange = (filterName, value) => {
     if (inputRefs[filterName]?.current) {
       cursorPositionRef.current = inputRefs[filterName].current.selectionStart;
@@ -126,14 +150,11 @@ const BillList = () => {
     try {
       let detailedBill = bill;
 
-      // Fetch full bill if items missing
       if (!bill.items || bill.items.length === 0) {
         detailedBill = await billService.getBillDetails(bill.invoiceNumber);
       }
 
       const items = detailedBill.items || [];
-
-      // Prepare rows for table
       const excelData = [
         [
           "S.N.",
@@ -156,27 +177,19 @@ const BillList = () => {
           item.rate.toFixed(2),
           item.discountPercent,
           item.isTaxable ? "Yes" : "No",
-          item.unit === "dozen"
-            ? (item.individualRate * 12).toFixed(2)
-            : item.unit === "box"
-            ? (item.individualRate * 6).toFixed(2)
-            : (item.individualRate * item.quantity).toFixed(2),
+          item.total.toFixed(2),
         ]);
       });
 
-      // Empty row + summary section
       excelData.push([]);
       excelData.push(["Bill Discount (%)", detailedBill.discountPercent]);
       excelData.push(["VAT (%)", detailedBill.vatPercent]);
       excelData.push(["Grand Total", detailedBill.grandTotal.toFixed(2)]);
 
-      // Convert array to sheet
       const worksheet = XLSX.utils.aoa_to_sheet(excelData);
-
-      // Column widths (auto upscale)
       const colWidths = [
-        { wch: 6 }, // S.N.
-        { wch: 25 }, // Product
+        { wch: 6 },
+        { wch: 25 },
         { wch: 10 },
         { wch: 10 },
         { wch: 10 },
@@ -186,70 +199,15 @@ const BillList = () => {
       ];
       worksheet["!cols"] = colWidths;
 
-      // Apply styling to header row
-      const headerCells = ["A1", "B1", "C1", "D1", "E1", "F1", "G1", "H1"];
-      headerCells.forEach((cell) => {
-        if (worksheet[cell]) {
-          worksheet[cell].s = {
-            font: { bold: true, sz: 12 },
-            fill: { fgColor: { rgb: "D9E1F2" } },
-            border: {
-              top: { style: "thin", color: { rgb: "000000" } },
-              bottom: { style: "thin", color: { rgb: "000000" } },
-              left: { style: "thin", color: { rgb: "000000" } },
-              right: { style: "thin", color: { rgb: "000000" } },
-            },
-          };
-        }
-      });
-
-      // Apply border to all data rows
-      excelData.forEach((row, rIndex) => {
-        row.forEach((_, cIndex) => {
-          const cellAddress = XLSX.utils.encode_cell({ r: rIndex, c: cIndex });
-          if (worksheet[cellAddress]) {
-            worksheet[cellAddress].s = {
-              border: {
-                top: { style: "thin", color: { rgb: "999999" } },
-                bottom: { style: "thin", color: { rgb: "999999" } },
-                left: { style: "thin", color: { rgb: "999999" } },
-                right: { style: "thin", color: { rgb: "999999" } },
-              },
-            };
-          }
-        });
-      });
-
-      // Style summary section
-      const summaryStart = items.length + 2;
-      const summaryCells = [
-        `A${summaryStart + 1}`,
-        `A${summaryStart + 2}`,
-        `A${summaryStart + 3}`,
-      ];
-
-      summaryCells.forEach((cell) => {
-        if (worksheet[cell]) {
-          worksheet[cell].s = {
-            font: { bold: true, sz: 12 },
-          };
-        }
-      });
-
-      // ---------------------------------------------
-
-      // Create workbook
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Invoice");
 
-      // Generate Excel file
       const excelBuffer = XLSX.write(workbook, {
         bookType: "xlsx",
         type: "array",
         cellStyles: true,
       });
 
-      // Download file
       const blob = new Blob([excelBuffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
@@ -265,25 +223,15 @@ const BillList = () => {
     try {
       setPrintingBill(bill.invoiceNumber);
 
-      // Fetch detailed bill
-      const response = await billService.getBillDetails(bill.invoiceNumber);
-      // console.log("Full API response:", response);
-
-      const detailedBill = response.data || response.bill || response;
-      // console.log("Detailed bill:", detailedBill);
-      // console.log("Items:", detailedBill.items);
-
-      if (
-        !detailedBill ||
-        !detailedBill.items ||
-        detailedBill.items.length === 0
-      ) {
-        throw new Error("No items found in bill. The bill may be incomplete.");
+      if (bill.items && bill.items.length > 0) {
+        printBillDetails(bill);
+      } else {
+        const detailedBill = await billService.getBillDetails(
+          bill.invoiceNumber
+        );
+        printBillDetails(detailedBill);
       }
-
-      printBillDetails(detailedBill);
     } catch (error) {
-      console.error("Print error:", error);
       alert(`Print failed: ${error.message || "Failed to fetch bill details"}`);
     } finally {
       setPrintingBill(null);
@@ -307,13 +255,7 @@ const BillList = () => {
         <td>Rs. ${item.rate.toFixed(2)}</td>
         <td>${item.discountPercent}%</td>
         <td>${item.isTaxable ? "Yes" : "No"}</td>
-        <td>Rs. ${
-          item.unit === "dozen"
-            ? (item.individualRate * 12).toFixed(2)
-            : item.unit === "box"
-            ? (item.individualRate * 6).toFixed(2)
-            : (item.individualRate * item.quantity).toFixed(2)
-        }</td>
+        <td>Rs. ${item.total.toFixed(2)}</td>
       </tr>`
       )
       .join("");
@@ -508,35 +450,37 @@ const BillList = () => {
                     </td>
 
                     {/* ACTION BUTTONS */}
-                    <td className="p-2 border border-gray-300 text-center flex gap-3 justify-center">
-                      {/* view list button */}
-                      <button
-                        onClick={() => {
-                          console.log("Hello world ");
-                        }}
-                        className="bg-yellow-500 text-white px-3 py-1 rounded-md hover:bg-yellow-900"
-                      >
-                        Details
-                      </button>
-                      {/* Print Button */}
-                      <button
-                        onClick={() => handlePrintBill(bill)}
-                        disabled={printingBill === bill.invoiceNumber}
-                        className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700"
-                      >
-                        {printingBill === bill.invoiceNumber
-                          ? "Loading..."
-                          : "Print"}
-                      </button>
+                    <td className="p-2 border border-gray-300 text-center">
+                      <div className="flex gap-2 justify-center">
+                        {/* Details Button */}
+                        <button
+                          onClick={() => handleViewDetails(bill)}
+                          disabled={loadingDetails}
+                          className="bg-yellow-500 text-white px-3 py-1 rounded-md hover:bg-yellow-600 disabled:bg-yellow-300"
+                        >
+                          {loadingDetails ? "Loading..." : "Details"}
+                        </button>
 
-                      {/* Excel Button */}
-                      <button
-                        onClick={() => downloadExcel(bill)}
-                        className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700"
-                        title="Download Excel"
-                      >
-                        <AiFillFileExcel size={20} />
-                      </button>
+                        {/* Print Button */}
+                        <button
+                          onClick={() => handlePrintBill(bill)}
+                          disabled={printingBill === bill.invoiceNumber}
+                          className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+                        >
+                          {printingBill === bill.invoiceNumber
+                            ? "Loading..."
+                            : "Print"}
+                        </button>
+
+                        {/* Excel Button */}
+                        <button
+                          onClick={() => downloadExcel(bill)}
+                          className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 flex items-center justify-center"
+                          title="Download Excel"
+                        >
+                          <AiFillFileExcel size={20} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -561,6 +505,14 @@ const BillList = () => {
           </div>
         )}
       </div>
+
+      {/* Bill Detail Modal */}
+      {selectedBill && (
+        <BillDetailModal
+          bill={selectedBill}
+          onClose={() => setSelectedBill(null)}
+        />
+      )}
     </>
   );
 };

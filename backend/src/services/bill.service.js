@@ -332,6 +332,9 @@ class BillService {
       const queryBuilder = billRepository
         .createQueryBuilder("bill")
         .leftJoinAndSelect("bill.customer", "customer")
+        .leftJoinAndSelect("bill.items", "items")
+        .leftJoinAndSelect("items.product", "product")
+        .leftJoinAndSelect("bill.returns", "returns")
         .orderBy("bill.invoiceNumber", "ASC");
 
       if (filters.customerName) {
@@ -373,7 +376,7 @@ class BillService {
       // Count query
       const countQueryBuilder = billRepository
         .createQueryBuilder("bill")
-        .leftJoin("bill.customer", "customer") // JOIN for count
+        .leftJoin("bill.customer", "customer")
         .select("COUNT(bill.id)", "count");
 
       if (filters.customerName) {
