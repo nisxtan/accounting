@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   AiOutlineMenu,
   AiFillHome,
@@ -27,7 +27,6 @@ const ReturnPage = () => {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
 
-  // State for return
   const [returnNumber, setReturnNumber] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [originalInvoiceData, setOriginalInvoiceData] = useState(null);
@@ -37,33 +36,59 @@ const ReturnPage = () => {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isReadOnly, setIsReadOnly] = useState(true);
-  const [step, setStep] = useState(1); // 1: Enter invoice, 2: View, 3: Edit
+  const [step, setStep] = useState(1);
 
-  // State for customers
   const [customerOptions, setCustomerOptions] = useState([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
 
-  // Get return number on page load
+  const messageTimeoutRef = useRef(null);
+  const errorTimeoutRef = useRef(null);
+  const hasFetchedReturnNumber = useRef(false);
+
   useEffect(() => {
-    fetchReturnNumber();
+    if (!hasFetchedReturnNumber.current) {
+      fetchReturnNumber();
+      hasFetchedReturnNumber.current = true;
+    }
     loadCustomers();
+
+    return () => {
+      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    };
   }, []);
+
+  const showMessage = (msg) => {
+    setMessage(msg);
+    if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+    messageTimeoutRef.current = setTimeout(() => {
+      setMessage("");
+    }, 5000);
+  };
+
+  const showError = (err) => {
+    setError(err);
+    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    errorTimeoutRef.current = setTimeout(() => {
+      setError("");
+    }, 5000);
+  };
 
   const fetchReturnNumber = async () => {
     try {
       setLoading(true);
       const response = await returnService.getNewReturnNumber();
-      console.log("Fetched number", response);
       setReturnNumber(response.returnNumber);
-      setMessage("Return number generated successfully");
+      showMessage("Return number generated successfully");
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to generate return number");
+      showError(
+        err.response?.data?.error || "Failed to generate return number"
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // Load customers (same as Home.jsx)
   const loadCustomers = async (search = "") => {
     try {
       setIsLoadingCustomers(true);
@@ -91,10 +116,9 @@ const ReturnPage = () => {
     }
   };
 
-  // Load invoice when entered
   const handleLoadInvoice = async () => {
     if (!invoiceNumber.trim()) {
-      setError("Please enter an invoice number");
+      showError("Please enter an invoice number");
       return;
     }
 
@@ -102,54 +126,45 @@ const ReturnPage = () => {
       setLoading(true);
       setError("");
       const response = await returnService.getInvoiceForReturn(invoiceNumber);
-      // console.log("API Response for invoice", invoiceNumber, ":", response);
-      // console.log("Response items:", response.items);
-      // console.log("First item:", response.items[0]);
+
       setOriginalInvoiceData(response);
       setStep(2);
 
-      // Transform to Table component format
       const itemsForTable = response.items.map((item) => ({
-        id: item.id, // salesItemId
+        id: item.id,
         productId: item.productId,
         productName: item.productName,
-        quantity: item.originalQuantity, // Original sold quantity
+        quantity: item.originalQuantity,
         unit: item.unit,
-        rate: item.rate, // Original rate
+        rate: item.rate,
         isTaxable: item.isTaxable,
-        discountPercent: 0, // Not applicable for returns
-
-        // Return-specific fields
+        discountPercent: 0,
         availableToReturn: item.availableToReturn,
-        returnedQuantity: 0, // Editable - start with 0
-        refundRate: item.rate, // Editable - default to original rate
-        reason: "", // Editable per item
+        returnedQuantity: 0,
+        refundRate: item.rate,
+        reason: "",
         canReturn: item.canReturn,
-
-        // For Table component display
         originalQuantity: item.originalQuantity,
         alreadyReturned: item.alreadyReturned,
       }));
 
       setReturnItems(itemsForTable);
-      setMessage(`Invoice ${invoiceNumber} loaded successfully`);
+      showMessage(`Invoice ${invoiceNumber} loaded successfully`);
 
       if (!response.canReturn) {
-        setError("This invoice has no items available for return");
+        showError("This invoice has no items available for return");
       }
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to load invoice");
+      showError(err.response?.data?.error || "Failed to load invoice");
     } finally {
       setLoading(false);
     }
   };
 
-  // Update item field
   const updateItem = (itemId, field, value) => {
     setReturnItems((items) =>
       items.map((item) => {
         if (item.id === itemId) {
-          // Special validation for returned quantity
           if (field === "returnedQuantity") {
             const newQty = Math.max(0, parseInt(value) || 0);
             const maxAllowed = item.availableToReturn;
@@ -165,17 +180,10 @@ const ReturnPage = () => {
     );
   };
 
-  // Remove row (not really needed for returns but kept for consistency)
   const removeRow = (itemId) => {
     setReturnItems((items) => items.filter((item) => item.id !== itemId));
   };
 
-  // Add empty row (not applicable for returns)
-  // const addEmptyRow = () => {
-  //   console.log("Add row not applicable for returns");
-  // };
-
-  // Calculate totals for InvoiceSummary
   const calculateTotals = () => {
     const itemsWithReturn = returnItems.filter(
       (item) => item.returnedQuantity > 0
@@ -201,7 +209,7 @@ const ReturnPage = () => {
           (sum, item) => sum + item.returnedQuantity * item.refundRate,
           0
         ),
-      vatAmount: 0, // You can calculate VAT if needed
+      vatAmount: 0,
       grandTotal: subTotal,
       calculatedItems: itemsWithReturn.map((item) => ({
         id: item.id,
@@ -211,9 +219,7 @@ const ReturnPage = () => {
     };
   };
 
-  // Prepare data for Table component
   const prepareTableData = () => {
-    // Create originalQuantities and availableQuantities objects for Table
     const originalQuantities = {};
     const availableQuantities = {};
 
@@ -228,17 +234,15 @@ const ReturnPage = () => {
     };
   };
 
-  // Proceed to return editing
   const handleProceedToReturn = () => {
     if (!originalInvoiceData?.canReturn) {
-      setError("No items available for return");
+      showError("No items available for return");
       return;
     }
     setIsReadOnly(false);
     setStep(3);
   };
 
-  // Submit return
   const handleSubmitReturn = async () => {
     const itemsToReturn = returnItems
       .filter((item) => item.returnedQuantity > 0)
@@ -250,12 +254,12 @@ const ReturnPage = () => {
       }));
 
     if (itemsToReturn.length === 0) {
-      setError("Please select at least one item to return (quantity > 0)");
+      showError("Please select at least one item to return (quantity > 0)");
       return;
     }
 
     if (!reason.trim()) {
-      setError("Please enter a reason for the return");
+      showError("Please enter a reason for the return");
       return;
     }
 
@@ -269,12 +273,11 @@ const ReturnPage = () => {
         items: itemsToReturn,
       });
 
-      setMessage(
+      showMessage(
         `Return ${response.return.returnNumber} created successfully!`
       );
-      setStep(4); // Success step
+      setStep(4);
 
-      // Reset form after success
       setTimeout(() => {
         setInvoiceNumber("");
         setOriginalInvoiceData(null);
@@ -282,28 +285,26 @@ const ReturnPage = () => {
         setReason("");
         setIsReadOnly(true);
         setStep(1);
-        fetchReturnNumber(); // Get new return number
+        hasFetchedReturnNumber.current = false;
+        fetchReturnNumber();
       }, 3000);
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to create return");
+      showError(err.response?.data?.error || "Failed to create return");
     } finally {
       setLoading(false);
     }
   };
 
-  // Logout (same as Home.jsx)
   const handleLogout = () => {
     dispatch(logout());
     persistor.purge();
   };
 
-  // Go back to view mode
   const handleBackToView = () => {
     setIsReadOnly(true);
     setStep(2);
   };
 
-  // Reset form
   const handleReset = () => {
     setInvoiceNumber("");
     setOriginalInvoiceData(null);
@@ -313,19 +314,14 @@ const ReturnPage = () => {
     setStep(1);
     setError("");
     setMessage("");
+    hasFetchedReturnNumber.current = false;
     fetchReturnNumber();
   };
 
-  // Prepare table props
   const tableData = prepareTableData();
-
-  useEffect(() => {
-    // console.log("OID=:>", originalInvoiceData);
-  }, [originalInvoiceData]);
 
   return (
     <div className="bg-slate-300 min-h-screen">
-      {/* Header - Same as Home.jsx */}
       <header className="flex justify-between items-start px-6 py-3 gap-3">
         <div className="flex items-center gap-3">
           <AiOutlineMenu className="text-2xl mt-1" />
@@ -365,7 +361,6 @@ const ReturnPage = () => {
         </div>
       </header>
 
-      {/* Return Input Section */}
       <div className="flex justify-evenly items-center px-6 py-6 gap-3">
         <InputComponent
           icon={AiFillBook}
@@ -375,7 +370,6 @@ const ReturnPage = () => {
           disabled={true}
         />
 
-        {/* Return Date */}
         <InputComponent
           icon={AiFillCalendar}
           label="Return Date"
@@ -385,7 +379,6 @@ const ReturnPage = () => {
           disabled={true}
         />
 
-        {/* Invoice Number Input */}
         <div className="w-full max-w-md">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Original Invoice Number <span className="text-red-500">*</span>
@@ -411,7 +404,6 @@ const ReturnPage = () => {
         </div>
       </div>
 
-      {/* Message Display */}
       {message && (
         <div className="mx-6 mb-4 p-3 bg-green-100 text-green-700 rounded-lg">
           {message}
@@ -423,7 +415,6 @@ const ReturnPage = () => {
         </div>
       )}
 
-      {/* Invoice Details Display */}
       {originalInvoiceData && step >= 2 && (
         <div className="mx-6 mb-4 p-4 bg-white rounded-lg shadow">
           <div className="flex justify-between items-center mb-4">
@@ -448,13 +439,21 @@ const ReturnPage = () => {
               </div>
 
               {step === 2 && (
-                <button
-                  onClick={handleProceedToReturn}
-                  disabled={!originalInvoiceData.canReturn || loading}
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
-                >
-                  Proceed to Return
-                </button>
+                <div className="flex gap-5 text-center justify-center">
+                  <button
+                    onClick={handleReset}
+                    className="w-full py-3 bg-red-700  text-white border-2 border-gray-300 rounded-xl hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleProceedToReturn}
+                    disabled={!originalInvoiceData.canReturn || loading}
+                    className=" rounded-xl bg-green-700 w-full text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                  >
+                    Proceed
+                  </button>
+                </div>
               )}
 
               {step === 3 && (
@@ -467,13 +466,12 @@ const ReturnPage = () => {
         </div>
       )}
 
-      {/* Main Content Area */}
-      <div className="flex mx-6 gap-6">
-        <div className="flex-1">
-          {originalInvoiceData && step >= 2 && (
+      <div className="mx-6">
+        {originalInvoiceData && step >= 2 && (
+          <div className="mb-6">
             <Table
               items={returnItems}
-              products={[]} // Not needed for returns
+              products={[]}
               totals={calculateTotals()}
               onUpdateItem={updateItem}
               onRemoveRow={removeRow}
@@ -482,30 +480,28 @@ const ReturnPage = () => {
               originalQuantities={tableData.originalQuantities}
               availableQuantities={tableData.availableQuantities}
             />
-          )}
-        </div>
-
-        {/* Right: Invoice Summary & Actions */}
-        <div className="w-96">
-          {originalInvoiceData && step >= 2 && (
-            <>
-              {/* Invoice Summary */}
+          </div>
+        )}
+        {originalInvoiceData && step >= 2 && (
+          <div className="flex gap-6">
+            <div className="flex-1">
               <InvoiceSummary
                 totals={calculateTotals()}
                 billData={{
-                  discountPercent: 0, // No discount on returns
+                  discountPercent: 0,
                   vatPercent: originalInvoiceData.items.some(
                     (item) => item.isTaxable
                   )
                     ? 13
                     : 0,
                 }}
-                onUpdateBillData={() => {}} // Not needed for returns
+                onUpdateBillData={() => {}}
               />
+            </div>
 
-              {/* Reason Input and Actions */}
+            <div className="flex-1">
               {step === 3 && (
-                <div className="mt-4 p-4 bg-white rounded-lg shadow">
+                <div className="p-4 bg-white rounded-lg shadow">
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Overall Return Reason{" "}
@@ -552,9 +548,8 @@ const ReturnPage = () => {
                 </div>
               )}
 
-              {/* Success Message */}
               {step === 4 && (
-                <div className="mt-4 p-6 bg-green-50 border border-green-200 rounded-lg text-center">
+                <div className="p-6 bg-green-50 border border-green-200 rounded-lg text-center">
                   <div className="text-4xl text-green-500 mb-2">✓</div>
                   <h3 className="text-lg font-semibold text-green-700 mb-2">
                     Return Created Successfully!
@@ -570,12 +565,11 @@ const ReturnPage = () => {
                   </button>
                 </div>
               )}
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Loading overlay */}
       {loading && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl">

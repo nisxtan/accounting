@@ -51,6 +51,7 @@ const billService = {
       const response = await axiosInstance.get(
         `/bill/details/${invoiceNumber}`
       );
+      // console.log(response);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;

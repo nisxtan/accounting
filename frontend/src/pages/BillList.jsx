@@ -264,15 +264,26 @@ const BillList = () => {
   const handlePrintBill = async (bill) => {
     try {
       setPrintingBill(bill.invoiceNumber);
-      if (bill.items && bill.items.length > 0) {
-        printBillDetails(bill);
-      } else {
-        const detailedBill = await billService.getBillDetails(
-          bill.invoiceNumber
-        );
-        printBillDetails(detailedBill);
+
+      // Fetch detailed bill
+      const response = await billService.getBillDetails(bill.invoiceNumber);
+      // console.log("Full API response:", response);
+
+      const detailedBill = response.data || response.bill || response;
+      // console.log("Detailed bill:", detailedBill);
+      // console.log("Items:", detailedBill.items);
+
+      if (
+        !detailedBill ||
+        !detailedBill.items ||
+        detailedBill.items.length === 0
+      ) {
+        throw new Error("No items found in bill. The bill may be incomplete.");
       }
+
+      printBillDetails(detailedBill);
     } catch (error) {
+      console.error("Print error:", error);
       alert(`Print failed: ${error.message || "Failed to fetch bill details"}`);
     } finally {
       setPrintingBill(null);
@@ -312,7 +323,7 @@ const BillList = () => {
         <body>
           <h1>Sales Invoice</h1>
           <h3>Invoice #: ${bill.invoiceNumber}</h3>
-          <h3>Customer: ${bill.customer}</h3>
+          <h3>Customer: ${bill.customer.fullName}</h3>
           <h3>Date: ${new Date(bill.salesDate).toLocaleDateString()}</h3>
 
           <table border="1" cellspacing="0" cellpadding="6" width="100%">
@@ -498,6 +509,15 @@ const BillList = () => {
 
                     {/* ACTION BUTTONS */}
                     <td className="p-2 border border-gray-300 text-center flex gap-3 justify-center">
+                      {/* view list button */}
+                      <button
+                        onClick={() => {
+                          console.log("Hello world ");
+                        }}
+                        className="bg-yellow-500 text-white px-3 py-1 rounded-md hover:bg-yellow-900"
+                      >
+                        Details
+                      </button>
                       {/* Print Button */}
                       <button
                         onClick={() => handlePrintBill(bill)}

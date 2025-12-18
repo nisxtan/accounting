@@ -428,8 +428,10 @@ class BillService {
         .createQueryBuilder("bill")
         .leftJoinAndSelect("bill.items", "items")
         .leftJoinAndSelect("items.product", "product")
+        .leftJoinAndSelect("bill.customer", "customer")
         .where("bill.invoiceNumber = :invoiceNumber", { invoiceNumber })
         .getOne();
+      // console.log(bill);
       if (!bill) {
         throw new Error(`bill with invoice number ${invoiceNumber} not found.`);
       }

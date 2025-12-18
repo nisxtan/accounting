@@ -9,7 +9,7 @@ const Table = ({
   onUpdateItem,
   onRemoveRow,
   onAddRow,
-  // NEW PROPS FOR RETURN MODE:
+
   isReturnMode = false, // Default: sales mode
   isReadOnly = false, // Default: editable
   originalQuantities = {}, // For showing original sold quantities
@@ -20,7 +20,6 @@ const Table = ({
     if (isReadOnly) return;
 
     if (field === "unit") {
-      // Your existing unit conversion logic
     }
 
     // For returns, validate return quantity doesn't exceed available

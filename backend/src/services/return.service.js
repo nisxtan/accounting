@@ -1,3 +1,4 @@
+const { In } = require("typeorm");
 const { AppDataSource } = require("../config/database");
 
 const billService = require("./bill.service");
@@ -26,7 +27,7 @@ class ReturnService {
     const approvedReturns = await returnRepository.find({
       where: {
         originalInvoiceNumber: invoiceNumber,
-        status: "approved",
+        status: In(["approved", "pending"]),
       },
     });
 
